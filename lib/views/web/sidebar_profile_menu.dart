@@ -32,7 +32,7 @@ class _SidebarProfileMenuState extends State<SidebarProfileMenu> {
       context: context,
       position: position,
       color: Theme.of(context).cardColor,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), border: Border.all(color: Theme.of(context).dividerColor)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Theme.of(context).dividerColor)),
       items: [
         const PopupMenuItem(
           value: 'password',

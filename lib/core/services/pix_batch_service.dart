@@ -1,6 +1,3 @@
-import 'dart:io';
-import 'package:path_provider/path_provider.dart';
-
 class PixBatchService {
   
   /// Gera um arquivo TXT de Lote PIX (Formato simplificado CNAB)
@@ -38,16 +35,11 @@ class PixBatchService {
       String countStr = recordCount.toString().padLeft(6, '0');
       batchContent.writeln('99$countStr$totalAmountStr');
 
-      // Salvando o arquivo
-      final directory = await getApplicationDocumentsDirectory();
-      final filePath = '${directory.path}/LOTE_PIX_CHECKFAST_$dateStr.txt';
-      
-      File file = File(filePath);
-      await file.writeAsString(batchContent.toString());
-
-      return filePath;
+      // No Web, poderíamos disparar o download do Blob aqui.
+      // Por enquanto, apenas retornamos sucesso simulado.
+      return "Lote_Gerado_Web";
     } catch (e) {
-      print("Erro ao gerar lote PIX: \$e");
+      print("Erro ao gerar lote PIX: $e");
       return null;
     }
   }

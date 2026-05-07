@@ -11,16 +11,24 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
-  google_fonts: ^6.2.1
-  firebase_core: ^3.0.0
-  cloud_firestore: ^5.0.0
-  firebase_auth: ^5.0.0
+  google_fonts: ^6.3.0
+  firebase_core: ^3.15.2
+  cloud_firestore: ^5.6.12
+  firebase_auth: ^5.7.0
   firebase_storage: ^12.0.0
-  provider: ^6.1.2
+  provider: ^6.1.5+1
   shared_preferences: ^2.2.2
-  excel: ^4.0.3 # Exportação em XLS
+  excel: ^4.0.6 # Exportação em XLS
   google_mlkit_face_detection: ^0.10.0 # Anti-Fraude Facial
   flutter_local_notifications: ^17.0.0 # Alerta de Falta
+  url_launcher: ^6.3.1
+  fl_chart: ^0.71.0
+  geolocator: 12.0.0
+  image_picker: ^1.1.2
+  intl: ^0.19.0
+  safe_device: ^1.3.10
+  firebase_app_check: ^0.3.2+10
+  iconsax_plus: ^1.0.0
 
 dev_dependencies:
   flutter_test:

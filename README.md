@@ -78,3 +78,17 @@ Notifica o aparelho do colaborador e levanta um alerta silencioso no painel Web 
    ```bash
    flutter run
    ```
+
+---
+
+## 🔒 Governança e Ciclo de Deploy (Regra de Ouro)
+
+Para garantir a estabilidade do sistema e a confiança na auditoria de pagamentos, a seguinte regra de CI/CD é **obrigatória** para todos os desenvolvedores e agentes trabalhando no CheckFast:
+
+> **Regra de Ouro de Lançamento:**  
+> A partir de hoje, **toda criação de telas novas, fluxos novos ou qualquer alteração no sistema** deve seguir rigorosamente o fluxo de dois estágios:
+> 
+> 1. **Ambiente de Homologação (Staging/Testes):** A funcionalidade deve ser lançada em ambiente isolado (utilizando o *DevTools* ou apontando para um banco/projeto Firebase de testes). Toda a mecânica de aprovação e erros deve ser simulada aqui primeiro.
+> 2. **Ambiente Real (Produção):** Apenas após **tudo ser exaustivamente aprovado** em homologação, a alteração poderá ser promovida para o ambiente de Produção, que é vinculado ao domínio oficial e utilizado ativamente pelos promotores reais e gestores da agência.
+>
+> *Não são permitidos deploys diretos em produção sem validação prévia.*

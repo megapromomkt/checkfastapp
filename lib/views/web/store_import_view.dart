@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:excel/excel.dart';
 import '../../core/constants/premium_theme.dart';
 
 class StoreImportView extends StatefulWidget {
@@ -10,111 +9,163 @@ class StoreImportView extends StatefulWidget {
 }
 
 class _StoreImportViewState extends State<StoreImportView> {
-  bool _isImporting = false;
-  double _progress = 0.0;
-  final int _maxLimit = 10000;
-
-  void _downloadTemplate() {
-    var excel = Excel.createExcel();
-    Sheet sheetObject = excel['Lista_de_Lojas'];
-    
-    // Cabeçalho Padrão
-    sheetObject.appendRow(['NOME_FANTASIA', 'CNPJ', 'LOGRADOURO', 'BAIRRO', 'CIDADE', 'ESTADO', 'CEP', 'LATITUDE', 'LONGITUDE']);
-    
-    // Exemplo
-    sheetObject.appendRow(['Exemplo Loja 01', '00.000.000/0001-00', 'Rua Exemplo, 123', 'Centro', 'São Paulo', 'SP', '01001-000', '-23.5505', '-46.6333']);
-
-    excel.save(fileName: 'modelo_importacao_checkfast.xlsx');
-  }
-
-  void _startImport() async {
-    setState(() {
-      _isImporting = true;
-      _progress = 0.0;
-    });
-
-    // Simulando processamento de até 10.000 linhas
-    for (int i = 0; i <= 100; i++) {
-      await Future.delayed(const Duration(milliseconds: 50));
-      setState(() {
-        _progress = i / 100;
-      });
-    }
-
-    setState(() {
-      _isImporting = false;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Importação concluída com sucesso!'), backgroundColor: AppColors.successEmerald),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.spaceBlack,
-      body: Center(
-        child: Container(
-          width: 600,
-          padding: const EdgeInsets.all(40),
-          decoration: BoxDecoration(color: AppColors.cardDark, borderRadius: BorderRadius.circular(20), border: Border.all(color: AppColors.glassBorderDark)),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.file_upload_outlined, color: AppColors.neonCyan, size: 60),
-              const SizedBox(height: 20),
-              const Text('Importador em Massa', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 10),
-              Text('Suba até $_maxLimit lojas de uma só vez usando nosso modelo padrão.', style: const TextStyle(color: AppColors.textSecondary), textAlign: TextAlign.center),
-              const SizedBox(height: 40),
-              
-              // Passo 1: Download do Modelo
-              _buildStepCard(
-                '1. Baixe o Modelo',
-                'Use nossa planilha padrão para evitar erros de leitura.',
-                Icons.download,
-                _downloadTemplate,
-              ),
-              const SizedBox(height: 20),
-              
-              // Passo 2: Upload
-              _buildStepCard(
-                '2. Envie o Arquivo',
-                'Selecione a planilha preenchida (máx. 10.000 lojas).',
-                Icons.drive_folder_upload,
-                _isImporting ? null : _startImport,
-              ),
-              
-              if (_isImporting) ...[
-                const SizedBox(height: 40),
-                LinearProgressIndicator(value: _progress, backgroundColor: Colors.white10, color: AppColors.neonCyan),
-                const SizedBox(height: 10),
-                Text('${(_progress * 100).toInt()}% Processado', style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStepCard(String title, String sub, IconData icon, VoidCallback? onTap) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(color: AppColors.spaceBlack, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.glassBorderDark)),
-        child: Row(
+    return DefaultTabController(
+      length: 3,
+      child: Padding(
+        padding: const EdgeInsets.all(40.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: AppColors.electricBlue),
-            const SizedBox(width: 20),
+            const PremiumHeader(title: 'Gestão de Lojas', subtitle: 'Gerencie pontos de venda, cadastre novas unidades ou importe listas massivas.'),
+            const SizedBox(height: 30),
+            const TabBar(
+              isScrollable: true,
+              indicatorColor: AppColors.neonCyan,
+              labelColor: AppColors.neonCyan,
+              unselectedLabelColor: AppColors.textSecondary,
+              tabs: [
+                Tab(text: 'PESQUISAR LOJAS'),
+                Tab(text: 'CADASTRO MANUAL'),
+                Tab(text: 'IMPORTAÇÃO EM MASSA'),
+              ],
+            ),
+            const SizedBox(height: 30),
             Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)), Text(sub, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12))]),
+              child: TabBarView(
+                children: [
+                  _buildSearchTab(),
+                  _buildManualEntryTab(),
+                  _buildBulkImportTab(),
+                ],
+              ),
             ),
           ],
         ),
       ),
     );
   }
+
+  Widget _buildSearchTab() {
+    return Column(
+      children: [
+        PremiumCard(
+          child: Row(
+            children: [
+              const Expanded(
+                child: TextField(
+                  decoration: InputDecoration(
+                    hintText: 'Filtrar por Nome, Cidade ou CNPJ...', 
+                    hintStyle: TextStyle(color: Colors.white24, fontSize: 14), 
+                    prefixIcon: Icon(Icons.search, color: AppColors.neonCyan), 
+                    border: InputBorder.none
+                  )
+                )
+              ),
+              ElevatedButton(
+                onPressed: () {}, 
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.neonCyan), 
+                child: const Text('FILTRAR', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold))
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 30),
+        Expanded(
+          child: PremiumCard(
+            child: ListView.separated(
+              itemCount: 10,
+              separatorBuilder: (_, __) => const Divider(color: Colors.white10),
+              itemBuilder: (context, index) => ListTile(
+                leading: const Icon(Icons.store, color: AppColors.neonCyan),
+                title: Text('Atacadão - Unidade #$index', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                subtitle: Text('CNPJ: 00.000.000/0001-0$index | São Paulo - SP', style: const TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildManualEntryTab() {
+    return PremiumCard(
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Dados da Unidade', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 20),
+            _buildField('Nome da Loja'),
+            _buildField('CNPJ'),
+            _buildField('Endereço Completo'),
+            _buildField('Responsável na Loja'),
+            _buildField('Telefone / WhatsApp'),
+            _buildField('Latitude'),
+            _buildField('Longitude'),
+            const SizedBox(height: 30),
+            SizedBox(
+              width: double.infinity, 
+              child: ElevatedButton.icon(
+                onPressed: () {}, 
+                icon: const Icon(Icons.save, color: Colors.black), 
+                label: const Text('CADASTRAR UNIDADE AGORA', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)), 
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.neonCyan, 
+                  padding: const EdgeInsets.all(20),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                )
+              )
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBulkImportTab() {
+    return PremiumCard(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.cloud_upload_outlined, color: AppColors.neonCyan, size: 60),
+          const SizedBox(height: 20),
+          const Text('Arraste sua planilha .xlsx aqui', style: TextStyle(color: Colors.white, fontSize: 18)),
+          const SizedBox(height: 40),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center, 
+            children: [
+              OutlinedButton.icon(
+                onPressed: () {}, 
+                icon: const Icon(Icons.download, color: AppColors.neonCyan), 
+                label: const Text('MODELO XLS', style: TextStyle(color: AppColors.neonCyan)), 
+                style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.neonCyan), padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15))
+              ),
+              const SizedBox(width: 20),
+              ElevatedButton.icon(
+                onPressed: () {}, 
+                icon: const Icon(Icons.upload, color: Colors.black), 
+                label: const Text('SELECIONAR ARQUIVO', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)), 
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.neonCyan, padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15))
+              ),
+            ]
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildField(String label) => Padding(
+    padding: const EdgeInsets.only(bottom: 10), 
+    child: TextField(
+      style: const TextStyle(color: Colors.white, fontSize: 14), 
+      decoration: InputDecoration(
+        labelText: label, 
+        labelStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 12), 
+        enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.white10)), 
+        focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: AppColors.neonCyan))
+      )
+    )
+  );
 }

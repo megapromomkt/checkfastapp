@@ -20,28 +20,28 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'SUA_API_KEY_WEB',
-    appId: 'SEU_APP_ID_WEB',
-    messagingSenderId: 'SEU_SENDER_ID',
-    projectId: 'checkfast-9ce1f',
-    authDomain: 'checkfast-9ce1f.firebaseapp.com',
-    storageBucket: 'checkfast-9ce1f.appspot.com',
+    apiKey: 'AGUARDANDO_CHAVE_WEB',
+    appId: 'AGUARDANDO_APP_ID_WEB',
+    messagingSenderId: 'AGUARDANDO_SENDER_ID',
+    projectId: 'checkfast-28a72',
+    authDomain: 'checkfast-28a72.firebaseapp.com',
+    storageBucket: 'checkfast-28a72.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'SUA_API_KEY_ANDROID',
-    appId: 'SEU_APP_ID_ANDROID',
-    messagingSenderId: 'SEU_SENDER_ID',
-    projectId: 'checkfast-9ce1f',
-    storageBucket: 'checkfast-9ce1f.appspot.com',
+    apiKey: 'AGUARDANDO_CHAVE_ANDROID',
+    appId: 'AGUARDANDO_APP_ID_ANDROID',
+    messagingSenderId: 'AGUARDANDO_SENDER_ID',
+    projectId: 'checkfast-28a72',
+    storageBucket: 'checkfast-28a72.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'SUA_API_KEY_IOS',
-    appId: 'SEU_APP_ID_IOS',
-    messagingSenderId: 'SEU_SENDER_ID',
-    projectId: 'checkfast-9ce1f',
-    storageBucket: 'checkfast-9ce1f.appspot.com',
-    iosBundleId: 'com.seunome.checkfast',
+    apiKey: 'AGUARDANDO_CHAVE_IOS',
+    appId: 'AGUARDANDO_APP_ID_IOS',
+    messagingSenderId: 'AGUARDANDO_SENDER_ID',
+    projectId: 'checkfast-28a72',
+    storageBucket: 'checkfast-28a72.firebasestorage.app',
+    iosBundleId: 'com.megapromo.checkfast',
   );
 }

@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'core/constants/premium_theme.dart';
+import 'views/web/landing_page_view.dart';
+import 'views/web/agency_login_view.dart';
+import 'views/web/admin_dashboard_view.dart';
+import 'views/mobile/promoter_home_view.dart';
 
 void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const CheckFastApp());
 }
 
@@ -14,47 +20,26 @@ class CheckFastApp extends StatelessWidget {
     return MaterialApp(
       title: 'CheckFast',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.premiumLight,
-      darkTheme: AppTheme.premiumDark,
-      themeMode: ThemeMode.system,
-      home: const DashboardView(),
-    );
-  }
-}
-
-class InitialScreen extends StatelessWidget {
-  const InitialScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.check_circle_outline, size: 80, color: AppColors.primaryBlue),
-            const SizedBox(height: 20),
-            Text(
-              'CheckFast',
-              style: TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                color: AppColors.darkBlue,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'presença comprovada, pagamento garantido.',
-              style: TextStyle(
-                fontSize: 16,
-                color: AppColors.neutralGray,
-              ),
-            ),
-            const SizedBox(height: 40),
-            CircularProgressIndicator(color: AppColors.primaryBlue),
-          ],
-        ),
+      theme: ThemeData(
+        brightness: Brightness.dark,
+        primaryColor: AppColors.neonCyan,
+        scaffoldBackgroundColor: AppColors.spaceBlack,
       ),
+      initialRoute: '/',
+      onGenerateRoute: (settings) {
+        switch (settings.name) {
+          case '/':
+            return MaterialPageRoute(builder: (_) => const LandingPageView());
+          case '/megapromo':
+            return MaterialPageRoute(builder: (_) => const AgencyLoginView());
+          case '/admin':
+            return MaterialPageRoute(builder: (_) => const AdminDashboardView());
+          case '/promoter':
+            return MaterialPageRoute(builder: (_) => const PromoterHomeView());
+          default:
+            return MaterialPageRoute(builder: (_) => const LandingPageView());
+        }
+      },
     );
   }
 }

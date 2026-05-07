@@ -1,0 +1,81 @@
+Flutter crash report.
+Please report a bug at https://github.com/flutter/flutter/issues.
+
+## command
+
+flutter run -d chrome --release --web-renderer canvaskit
+
+## exception
+
+FileSystemException: FileSystemException: Failed to decode data using encoding 'utf-8', path = 'C:\Users\Stand Alone\.gemini\antigravity\scratch\checkfast\.gitignore'
+
+```
+#0      _File._tryDecode (dart:io/file_impl.dart:615:7)
+#1      _File.readAsStringSync (dart:io/file_impl.dart:624:7)
+#2      _File.readAsLinesSync (dart:io/file_impl.dart:630:36)
+#3      ForwardingFile.readAsLinesSync (package:file/src/forwarding/forwarding_file.dart:107:16)
+#4      ForwardingFile.readAsLinesSync (package:file/src/forwarding/forwarding_file.dart:107:16)
+#5      ProjectMigrator.processFileLines (package:flutter_tools/src/base/project_migrator.dart:40:37)
+#6      ScrubGeneratedPluginRegistrant.migrate (package:flutter_tools/src/web/migrations/scrub_generated_plugin_registrant.dart:29:7)
+#7      ProjectMigration.run (package:flutter_tools/src/base/project_migrator.dart:84:22)
+#8      WebBuilder.buildWeb (package:flutter_tools/src/web/compile.dart:87:21)
+<asynchronous suspension>
+#9      ResidentWebRunner.run.<anonymous closure> (package:flutter_tools/src/isolated/resident_web_runner.dart:352:11)
+<asynchronous suspension>
+#10     asyncGuard.<anonymous closure> (package:flutter_tools/src/base/async_guard.dart:111:24)
+<asynchronous suspension>
+```
+
+## flutter doctor
+
+```
+[!] Flutter (Channel stable, 3.24.3, on Microsoft Windows [versÆo 10.0.26200.8246], locale pt-BR)
+    • Flutter version 3.24.3 on channel stable at C:\Users\Stand Alone\flutter_sdk\flutter
+    ! The flutter binary is not on your path. Consider adding C:\Users\Stand Alone\flutter_sdk\flutter\bin to your path.
+    ! The dart binary is not on your path. Consider adding C:\Users\Stand Alone\flutter_sdk\flutter\bin to your path.
+    • Upstream repository https://github.com/flutter/flutter.git
+    • Framework revision 2663184aa7 (1 year, 7 months ago), 2024-09-11 16:27:48 -0500
+    • Engine revision 36335019a8
+    • Dart version 3.5.3
+    • DevTools version 2.37.3
+    • If those were intentional, you can disregard the above warnings; however it is recommended to use "git" directly to perform update checks and upgrades.
+
+[✓] Windows Version (Installed version of Windows is version 10 or higher)
+
+[✗] Android toolchain - develop for Android devices
+    ✗ Unable to locate Android SDK.
+      Install Android Studio from: https://developer.android.com/studio/index.html
+      On first launch it will assist you in installing the Android SDK components.
+      (or visit https://flutter.dev/to/windows-android-setup for detailed instructions).
+      If the Android SDK has been installed to a custom location, please use
+      `flutter config --android-sdk` to update to that location.
+
+
+[✓] Chrome - develop for the web
+    • Chrome at C:\Program Files\Google\Chrome\Application\chrome.exe
+
+[✗] Visual Studio - develop Windows apps
+    ✗ Visual Studio not installed; this is necessary to develop Windows apps.
+      Download at https://visualstudio.microsoft.com/downloads/.
+      Please install the "Desktop development with C++" workload, including all of its default components
+
+[!] Android Studio (not installed)
+    • Android Studio not found; download from https://developer.android.com/studio/index.html
+      (or visit https://flutter.dev/to/windows-android-setup for detailed instructions).
+
+[✓] VS Code (version unknown)
+    • VS Code at C:\Users\Stand Alone\AppData\Local\Programs\Microsoft VS Code
+    • Flutter extension can be installed from:
+      🔨 https://marketplace.visualstudio.com/items?itemName=Dart-Code.flutter
+    ✗ Unable to determine VS Code version.
+
+[✓] Connected device (3 available)
+    • Windows (desktop) • windows • windows-x64    • Microsoft Windows [versÆo 10.0.26200.8246]
+    • Chrome (web)      • chrome  • web-javascript • Google Chrome 147.0.7727.102
+    • Edge (web)        • edge    • web-javascript • Microsoft Edge 147.0.3912.72
+
+[✓] Network resources
+    • All expected network resources are available.
+
+! Doctor found issues in 4 categories.
+```
