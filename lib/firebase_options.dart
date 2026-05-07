@@ -20,26 +20,26 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AGUARDANDO_CHAVE_WEB',
-    appId: 'AGUARDANDO_APP_ID_WEB',
-    messagingSenderId: 'AGUARDANDO_SENDER_ID',
+    apiKey: 'AIzaSyDUK3AoHec6b_tVKxoXsZKGqisB-r29t2g',
+    appId: '1:409200466931:web:a51f90e2d3314049685086',
+    messagingSenderId: '409200466931',
     projectId: 'checkfast-28a72',
     authDomain: 'checkfast-28a72.firebaseapp.com',
     storageBucket: 'checkfast-28a72.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AGUARDANDO_CHAVE_ANDROID',
-    appId: 'AGUARDANDO_APP_ID_ANDROID',
-    messagingSenderId: 'AGUARDANDO_SENDER_ID',
+    apiKey: 'AIzaSyDUK3AoHec6b_tVKxoXsZKGqisB-r29t2g',
+    appId: '1:409200466931:android:AGUARDANDO_APP_ID_ANDROID', // Placeholder até criar o app Android
+    messagingSenderId: '409200466931',
     projectId: 'checkfast-28a72',
     storageBucket: 'checkfast-28a72.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AGUARDANDO_CHAVE_IOS',
-    appId: 'AGUARDANDO_APP_ID_IOS',
-    messagingSenderId: 'AGUARDANDO_SENDER_ID',
+    apiKey: 'AIzaSyDUK3AoHec6b_tVKxoXsZKGqisB-r29t2g',
+    appId: '1:409200466931:ios:AGUARDANDO_APP_ID_IOS', // Placeholder até criar o app iOS
+    messagingSenderId: '409200466931',
     projectId: 'checkfast-28a72',
     storageBucket: 'checkfast-28a72.firebasestorage.app',
     iosBundleId: 'com.megapromo.checkfast',
