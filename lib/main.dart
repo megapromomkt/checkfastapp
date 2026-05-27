@@ -35,9 +35,9 @@ class CheckFastApp extends StatelessWidget {
       title: 'CheckFast',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        brightness: Brightness.dark,
-        primaryColor: AppColors.neonCyan,
-        scaffoldBackgroundColor: AppColors.spaceBlack,
+        brightness: Brightness.light,
+        primaryColor: AppColors.primaryBlue,
+        scaffoldBackgroundColor: AppColors.background,
         fontFamily: 'Inter',
       ),
       initialRoute: isLoggedIn ? '/promoter' : '/',
@@ -53,6 +53,7 @@ class CheckFastApp extends StatelessWidget {
             return MaterialPageRoute(builder: (_) => const RedeLoginView());
           case '/rede_dashboard':
             return MaterialPageRoute(builder: (_) => const RedeDashboardView());
+          // Rotas legadas de compatibilidade
           case '/gerente':
             return MaterialPageRoute(builder: (_) => const RedeLoginView());
           case '/gerente_dashboard':

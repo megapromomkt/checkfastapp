@@ -4,21 +4,19 @@ import '../../core/constants/premium_theme.dart';
 import '../../core/utils/responsive.dart';
 import '../../models/register_models.dart';
 
-
+import '../../core/data/test_database.dart';
 import 'financial_module_view.dart';
 import 'presence_control_view.dart';
 import 'demands_management_view.dart';
 import 'registers_management_view.dart';
 import 'business_intelligence_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'users_management_view.dart';
 
 import 'settings_view.dart';
 import 'curriculum_search_view.dart';
 import 'reports_view.dart';
 import 'support_dashboard_view.dart';
-import 'admission_letters_view.dart';
 
 class AdminDashboardView extends StatefulWidget {
   const AdminDashboardView({super.key});
@@ -28,12 +26,19 @@ class AdminDashboardView extends StatefulWidget {
 }
 
 class AdminDashboardViewState extends State<AdminDashboardView> {
+  String? _initialChatCpf;
+
+  void switchToSupportChat(String cpf) {
+    setState(() {
+      _initialChatCpf = cpf;
+      _selectedModule = 8; // Index of SupportDashboardView (Mensagens)
+    });
+  }
   int _selectedModule = 0;
   bool _sidebarOpen = false;
   AppUser? _currentUser;
   String _userName = 'Admin Central';
   String _userRole = 'Master Access';
-  String? _activeChatCpf;
 
   @override
   void initState() {
@@ -44,17 +49,11 @@ class AdminDashboardViewState extends State<AdminDashboardView> {
   Future<void> _loadUserInfo() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _userName = prefs.getString('admin_user_name') ?? 'Admin Central';
-      _userRole = prefs.getString('admin_user_role') ?? 'Master Access';
+      _userName = prefs.getString('user_name') ?? 'Admin Central';
+      _userRole = prefs.getString('user_role') ?? 'Master Access';
     });
   }
 
-  void switchToSupportChat(String cpf) {
-    setState(() {
-      _activeChatCpf = cpf;
-      _selectedModule = 8; // Index corresponding to 'Mensagens'
-    });
-  }
 
   @override
   void didChangeDependencies() {
@@ -65,7 +64,8 @@ class AdminDashboardViewState extends State<AdminDashboardView> {
     }
   }
 
-  List<Widget> get _modules => [
+
+  final List<Widget> _modules = [
     const BIContent(),
     const RegistersManagementView(),
     const UsersManagementView(),
@@ -74,10 +74,16 @@ class AdminDashboardViewState extends State<AdminDashboardView> {
     const PresenceControlView(),
     const FinancialModuleView(),
     const ReportsView(),
-    SupportDashboardView(initialChatCpf: _activeChatCpf),
-    const AdmissionLettersView(),
+    const SupportDashboardView(),
     const SettingsView(),
   ];
+
+  Widget _getSelectedModuleWidget() {
+    if (_selectedModule == 8) {
+      return SupportDashboardView(initialChatCpf: _initialChatCpf);
+    }
+    return _modules[_selectedModule];
+  }
 
   static bool _isMobile(BuildContext context) => MediaQuery.of(context).size.width < 768;
 
@@ -89,6 +95,45 @@ class AdminDashboardViewState extends State<AdminDashboardView> {
       // Mobile: Drawer-based sidebar
       drawer: mobile ? _buildDrawer(context) : null,
       body: mobile ? _buildMobileLayout(context) : _buildDesktopLayout(context),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              backgroundColor: AppColors.surface,
+              surfaceTintColor: Colors.transparent,
+              title: const Text('Ambiente de Testes (DevTools)', style: TextStyle(color: AppColors.primaryBlue, fontWeight: FontWeight.w800)),
+              content: const Text('Escolha o que deseja fazer com o banco de dados temporário.', style: TextStyle(color: AppColors.textPrimary)),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    TestDatabase.instance.clearAllData();
+                    Navigator.pop(context);
+                    setState(() {});
+                  },
+                  child: const Text('Limpar Dados', style: TextStyle(color: Colors.redAccent))
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    TestDatabase.instance.seedTestData();
+                    Navigator.pop(context);
+                    setState(() {});
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryBlue,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                  ),
+                  child: const Text('Injetar Dados de Teste', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ],
+            )
+          );
+        },
+        backgroundColor: Colors.black,
+        icon: const Icon(IconsaxPlusLinear.code, color: Colors.white),
+        label: const Text('DevTools', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+      ),
     );
   }
 
@@ -103,7 +148,7 @@ class AdminDashboardViewState extends State<AdminDashboardView> {
               horizontal: Responsive.value<double>(context, mobile: 20, tablet: 32, desktop: 48),
               vertical: Responsive.value<double>(context, mobile: 20, tablet: 32, desktop: 40),
             ),
-            child: _modules[_selectedModule],
+            child: _getSelectedModuleWidget(),
           ),
         ),
       ],
@@ -142,7 +187,7 @@ class AdminDashboardViewState extends State<AdminDashboardView> {
         Expanded(
           child: Container(
             padding: EdgeInsets.all(Responsive.value<double>(context, mobile: 16, tablet: 20, desktop: 24)),
-            child: _modules[_selectedModule],
+            child: _getSelectedModuleWidget(),
           ),
         ),
       ],
@@ -190,8 +235,7 @@ class AdminDashboardViewState extends State<AdminDashboardView> {
           _buildMenuItem(context, 6, IconsaxPlusLinear.wallet_check, 'Financeiro', drawer: drawer),
           _buildMenuItem(context, 7, IconsaxPlusLinear.document_text, 'Relatórios', drawer: drawer),
           _buildMenuItem(context, 8, IconsaxPlusLinear.message_2, 'Mensagens', drawer: drawer),
-          _buildMenuItem(context, 9, IconsaxPlusLinear.document_favorite, 'Cartas', drawer: drawer),
-          _buildMenuItem(context, 10, IconsaxPlusLinear.setting_4, 'Configurações', drawer: drawer),
+          _buildMenuItem(context, 9, IconsaxPlusLinear.setting_4, 'Configurações', drawer: drawer),
           const Spacer(),
           Container(
             padding: const EdgeInsets.all(16),
@@ -228,14 +272,10 @@ class AdminDashboardViewState extends State<AdminDashboardView> {
           ),
           const SizedBox(height: 12),
           // Botão de Sair (Logout)
-           SizedBox(
+          SizedBox(
             width: double.infinity,
             child: TextButton.icon(
-              onPressed: () async {
-                await FirebaseAuth.instance.signOut();
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.remove('admin_user_name');
-                await prefs.remove('admin_user_role');
+              onPressed: () {
                 Navigator.pushReplacementNamed(context, '/megapromo');
               },
               icon: const Icon(IconsaxPlusLinear.logout, color: AppColors.error, size: 20),
@@ -254,7 +294,7 @@ class AdminDashboardViewState extends State<AdminDashboardView> {
   }
 
   String _moduleLabel(int index) {
-    const labels = ['Liquidez BI', 'Cadastros', 'Usuários', 'Demandas', 'Currículos', 'Presença', 'Financeiro', 'Relatórios', 'Mensagens', 'Cartas', 'Configurações'];
+    const labels = ['Liquidez BI', 'Cadastros', 'Usuários', 'Demandas', 'Currículos', 'Presença', 'Financeiro', 'Relatórios', 'Mensagens', 'Configurações'];
     return index < labels.length ? labels[index] : '';
   }
 

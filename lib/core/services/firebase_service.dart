@@ -9,7 +9,7 @@ class FirebaseService {
   /// Salva ou atualiza um usuário no banco
   Future<void> saveUser(UserModel user) async {
     try {
-      await _db.collection('users').doc(user.id).set(user.toMap(), SetOptions(merge: true));
+      await _db.collection('users').doc(user.id).set(user.toMap());
     } catch (e) {
       print("Erro ao salvar usuário: \$e");
       rethrow;
