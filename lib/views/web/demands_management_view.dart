@@ -3,6 +3,8 @@ import 'package:iconsax_plus/iconsax_plus.dart';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui';
+import 'dart:html' as html;
+import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/constants/premium_theme.dart';
 import '../../core/data/test_database.dart';
@@ -3935,12 +3937,276 @@ class _VacancyChronologyState extends State<VacancyChronology> {
   int _selectedStep = 1;
   final _leftScrollCtrl = ScrollController();
   final _rightScrollCtrl = ScrollController();
+  final Set<String> _selectedAppIds = {};
 
   @override
   void dispose() {
     _leftScrollCtrl.dispose();
     _rightScrollCtrl.dispose();
     super.dispose();
+  }
+
+  void _printLetterFromData(Map<String, dynamic> letter) {
+    final String formattedDate = DateFormat("dd/MM/yyyy").format(DateTime.now());
+    final String title = letter['title'] ?? 'CARTA DE APRESENTAÇÃO';
+    final String type = letter['type'] ?? 'diarias';
+    final String promoterName = letter['promoterName'] ?? '';
+    final String promoterCpfFormatted = letter['promoterCpfFormatted'] ?? letter['promoterCpf'] ?? '';
+    final String storeName = letter['storeName'] ?? '';
+    final String expiresAt = letter['expiresAt'] != null
+        ? DateFormat("dd/MM/yyyy").format(DateTime.parse(letter['expiresAt']))
+        : '';
+    final int validityDays = type == 'treinamento' ? 1 : 3;
+
+    final String printHtml = '''
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>$title — $promoterName</title>
+  <style>
+    @media print {
+      body {
+        margin: 0;
+        padding: 1.5cm;
+        font-family: Arial, sans-serif;
+        color: #000000;
+        background-color: #ffffff;
+      }
+      .no-print {
+        display: none;
+      }
+    }
+    body {
+      padding: 2cm;
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      line-height: 1.5;
+      color: #000000;
+    }
+    .header-container {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 0.5cm;
+    }
+    .logo-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 95px;
+      height: 95px;
+      border: 3.5px solid #E37A24;
+      border-radius: 50%;
+      font-family: 'Arial Black', Impact, sans-serif;
+    }
+    .logo-cart {
+      color: #E37A24;
+      font-size: 20px;
+      margin-bottom: 2px;
+      line-height: 1;
+    }
+    .logo-text-1 {
+      color: #E37A24;
+      font-size: 9px;
+      font-weight: 900;
+      text-align: center;
+      margin: 1px 0;
+      letter-spacing: 0.3px;
+    }
+    .logo-text-2 {
+      color: #1A3C70;
+      font-size: 6.5px;
+      font-weight: 900;
+      text-align: center;
+      letter-spacing: 0.2px;
+    }
+    .letter-title {
+      text-align: center;
+      font-weight: bold;
+      font-size: 16px;
+      margin-top: 1cm;
+      margin-bottom: 1cm;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #1A3C70;
+      border-bottom: 2px solid #E37A24;
+      padding-bottom: 8px;
+    }
+    .recipient {
+      margin-bottom: 0.8cm;
+      font-size: 14px;
+    }
+    .recipient p {
+      margin: 0;
+    }
+    .recipient .salutation {
+      margin-top: 15px;
+    }
+    .body-content {
+      font-size: 14px;
+      text-align: justify;
+    }
+    .body-content p {
+      margin-top: 0;
+      margin-bottom: 1.2em;
+    }
+    .body-content p.indent {
+      text-indent: 2.5em;
+    }
+    .bottom-section {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-top: 1.2cm;
+    }
+    .date-location {
+      font-size: 14px;
+      margin-top: 15px;
+    }
+    .stamp-box {
+      border: 2px solid #5d2596;
+      padding: 8px 12px;
+      width: 250px;
+      text-align: center;
+      font-family: Arial, sans-serif;
+      font-size: 8.5px;
+      color: #5d2596;
+      border-radius: 3px;
+      line-height: 1.3;
+    }
+    .stamp-box strong {
+      font-size: 11px;
+      display: block;
+      margin-bottom: 4px;
+      letter-spacing: 0.5px;
+    }
+    .signature-area {
+      margin-top: 1.8cm;
+      text-align: center;
+    }
+    .signature-line {
+      width: 350px;
+      border-top: 1.2px solid #000000;
+      margin: 0 auto 5px auto;
+    }
+    .signature-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      font-weight: bold;
+      color: #333333;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+  <div class="header-container">
+    <div class="logo-container">
+      <div class="logo-cart">🛒</div>
+      <div class="logo-text-1">MEGA PROMO</div>
+      <div class="logo-text-2">MERCHANDISING</div>
+    </div>
+  </div>
+  
+  <div class="letter-title">
+    $title
+  </div>
+
+  <div class="recipient">
+    <p>Ao</p>
+    <p><strong>$storeName</strong></p>
+    <p class="salutation">Prezados Senhores,</p>
+  </div>
+  <div class="body-content">
+    <p class="indent">A empresa <strong>MEGA WORLD SERVICOS DE TERCEIRIZACAO E MARKETING LTDA</strong>, vem por meio desta, comunicar que o(a) nosso(a) prestador(a) de serviço autônomo(a) Sr.(a) <strong>$promoterName</strong>, portador(a) do CPF <strong>$promoterCpfFormatted</strong>, está devidamente autorizado(a) e alocado(a) nesta unidade para realizar as atividades de ${type == 'treinamento' ? 'Treinamento Obrigatório Frente de Caixa' : 'Operações de Frente de Caixa / Diárias de Atendimento'}.</p>
+    
+    <p class="indent"><strong>Informações de Segurança e Treinamento:</strong> Declaramos que o referido prestador participou do treinamento referente ao uso do(s) EPI(s) e às Normas de Segurança do Trabalho, estando ciente do uso obrigatório dos Equipamentos de Proteção Individual, conforme Lei n.º 514, de 22/12/77, artigo 157.</p>
+    
+    <p class="indent"><strong>Validade do Documento:</strong> Esta carta possui finalidade exclusiva de credenciamento operacional e tem validade improrrogável de <strong>$validityDays dia(s)</strong> a partir da data de emissão, vencendo impreterivelmente em <strong>$expiresAt</strong>.</p>
+    
+    <p class="indent">Declaramos que o referido autônomo exercerá exclusivamente suas atividades comerciais de forma independente, não possuindo qualquer vínculo empregatício com a empresa de V.S.a., sendo de inteira responsabilidade da MEGA WORLD todos os encargos trabalhistas, previdenciários ou securitários que venham a incidir.</p>
+    
+    <p>Sendo o que nos apresenta, subscrevemo-nos</p>
+    <p>Atenciosamente,</p>
+  </div>
+  
+  <div class="bottom-section">
+    <div class="date-location">
+      São Paulo, $formattedDate
+    </div>
+    <div class="stamp-box">
+      <strong>60.970.093/0001-09</strong>
+      MEGA WORLD SERVIÇOS DE TERCEIRIZAÇÃO E MARKETING LTDA<br><br>
+      Endereço: AV MARCOS PENTEADO DE ULHOA RODRIGUES, 939 - TAMBORÉ, BARUERI / SP
+    </div>
+  </div>
+  
+  <div class="signature-area">
+    <div class="signature-line"></div>
+    <div class="signature-title">MEGA WORLD SERVIÇOS DE TERCEIRIZAÇÃO E MARKETING LTDA</div>
+  </div>
+  
+  <script>
+    window.onload = function() {
+      window.print();
+    }
+  </script>
+</body>
+</html>
+''';
+
+    final blob = html.Blob([printHtml], 'text/html;charset=utf-8');
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    html.window.open(url, '_blank');
+    html.Url.revokeObjectUrl(url);
+  }
+
+  Future<void> _transitionApplicants(List<QueryDocumentSnapshot> appsToTransition, String targetStatus) async {
+    final batch = FirebaseFirestore.instance.batch();
+    int newApprovals = 0;
+
+    for (var app in appsToTransition) {
+      final appData = app.data() as Map<String, dynamic>;
+      final currentStatus = appData['status'] ?? '';
+      final String cpf = appData['promoterCpf'] ?? '';
+
+      if (currentStatus != targetStatus) {
+        batch.update(app.reference, {'status': targetStatus});
+        if (targetStatus == 'aprovado' && currentStatus != 'aprovado' && currentStatus != 'selecionado') {
+          newApprovals++;
+        }
+
+        final promoter = widget.promoterMap[cpf];
+        final promoterName = promoter?['name'] ?? '';
+        final promoterCpfFormatted = promoter?['id'] ?? cpf;
+        final type = targetStatus == 'treinamento' ? 'treinamento' : 'diarias';
+
+        final letterRef = FirebaseFirestore.instance.collection('letters').doc("${widget.demand.id}_${cpf}_$type");
+        batch.set(letterRef, {
+          'demandId': widget.demand.id,
+          'promoterCpf': cpf,
+          'promoterName': promoterName,
+          'promoterCpfFormatted': promoterCpfFormatted,
+          'storeName': widget.demand.storeName,
+          'type': type,
+          'title': type == 'treinamento' ? 'CARTA DE APRESENTAÇÃO - TREINAMENTO' : 'CARTA DE APRESENTAÇÃO - DIÁRIAS',
+          'createdAt': DateTime.now().toIso8601String(),
+          'expiresAt': DateTime.now().add(Duration(days: type == 'treinamento' ? 1 : 3)).toIso8601String(),
+        });
+      }
+    }
+
+    if (newApprovals > 0) {
+      final newFilled = (widget.demand.filledVagas + newApprovals).clamp(0, widget.demand.totalVagas);
+      final demandStatus = (newFilled >= widget.demand.totalVagas) ? 'PREENCHIDAS' : widget.demand.status;
+      batch.update(FirebaseFirestore.instance.collection('demands').doc(widget.demand.id), {
+        'filledVagas': newFilled,
+        'status': demandStatus,
+      });
+    }
+
+    await batch.commit();
   }
 
   @override
@@ -3954,7 +4220,6 @@ class _VacancyChronologyState extends State<VacancyChronology> {
         final apps = snapshot.data?.docs ?? [];
         final totalApplicants = apps.length;
         
-        // Count how many applicants have curriculum details (represented as bio/presentation)
         int bioCount = 0;
         int trainingCompleteCount = 0;
         int approvedCount = 0;
@@ -3976,220 +4241,231 @@ class _VacancyChronologyState extends State<VacancyChronology> {
           }
         }
 
-        // Steps list
-        final steps = [
-          _ChronologyStep(
-            title: 'Abertura da Vaga',
-            subtitle: 'Publicada em ${widget.demand.date}',
-            icon: IconsaxPlusLinear.add_square,
-            status: _StepStatus.completed,
-            details: _buildAberturaDetails(),
-          ),
-          _ChronologyStep(
-            title: 'Captação & Cadastros',
-            subtitle: '$totalApplicants candidatos interessados',
-            icon: IconsaxPlusLinear.people,
-            status: totalApplicants > 0 ? _StepStatus.completed : _StepStatus.active,
-            details: _buildCaptacaoDetails(totalApplicants),
-          ),
-          _ChronologyStep(
-            title: 'Carta de Apresentação',
-            subtitle: '$bioCount apresentações recebidas',
-            icon: IconsaxPlusLinear.document_text,
-            status: bioCount > 0 ? _StepStatus.completed : _StepStatus.active,
-            details: _buildCartaDetails(bioCount, apps),
-          ),
-          _ChronologyStep(
-            title: 'Treinamento Obrigatório',
-            subtitle: '$trainingCompleteCount concluíram o treinamento',
-            icon: IconsaxPlusLinear.teacher,
-            status: trainingCompleteCount > 0 ? _StepStatus.completed : _StepStatus.active,
-            details: _buildTreinamentoDetails(trainingCompleteCount, apps),
-          ),
-          _ChronologyStep(
-            title: 'Aptos para Iniciar',
-            subtitle: '$approvedCount selecionados na triagem',
-            icon: IconsaxPlusLinear.shield_search,
-            status: approvedCount == widget.demand.totalVagas && approvedCount > 0
-                ? _StepStatus.completed 
-                : (approvedCount > 0 ? _StepStatus.active : _StepStatus.locked),
-            details: _buildAptosDetails(approvedCount, apps),
-          ),
-          _ChronologyStep(
-            title: 'Na Loja no Dia',
-            subtitle: widget.demand.status == 'EM ANDAMENTO' || widget.demand.status == 'FINALIZADAS'
-                ? 'Check-in validado com sucesso'
-                : 'Aguardando data da diária',
-            icon: IconsaxPlusLinear.gps,
-            status: widget.demand.status == 'EM ANDAMENTO' || widget.demand.status == 'FINALIZADAS'
-                ? _StepStatus.completed
-                : _StepStatus.locked,
-            details: _buildPresencaDetails(),
-          ),
-          _ChronologyStep(
-            title: 'Ação Realizada',
-            subtitle: widget.demand.status == 'FINALIZADAS'
-                ? 'Relatório final homologado'
-                : 'Aguardando término do serviço',
-            icon: IconsaxPlusLinear.task,
-            status: widget.demand.status == 'FINALIZADAS' 
-                ? _StepStatus.completed 
-                : _StepStatus.locked,
-            details: _buildAcaoDetails(),
-          ),
-        ];
+        return StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('letters')
+              .where('demandId', isEqualTo: widget.demand.id)
+              .snapshots(),
+          builder: (context, lettersSnapshot) {
+            final lettersDocs = lettersSnapshot.data?.docs ?? [];
+            final Map<String, Map<String, dynamic>> letterMap = {};
+            for (var doc in lettersDocs) {
+              final data = doc.data() as Map<String, dynamic>;
+              final cpf = data['promoterCpf'] ?? '';
+              final type = data['type'] ?? '';
+              letterMap["${cpf}_${type}"] = data;
+            }
 
-        return Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.cardBorder),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Left Column: Step List
-              SizedBox(
-                width: 380,
-                child: Scrollbar(
-                  controller: _leftScrollCtrl,
-                  thumbVisibility: true,
-                  child: SingleChildScrollView(
-                    controller: _leftScrollCtrl,
-                    padding: const EdgeInsets.only(right: 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'CRONOLOGIA DA VAGA - ${widget.demand.storeName.toUpperCase()}',
-                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: AppColors.textPrimary, letterSpacing: 0.5),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Acompanhe o funil de contratação e as etapas logísticas.',
-                          style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
-                        ),
-                        const SizedBox(height: 24),
-                        ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: steps.length,
-                          itemBuilder: (context, index) {
-                            final step = steps[index];
-                            final isSelected = _selectedStep == index;
-                            return InkWell(
-                              onTap: () {
-                                setState(() {
-                                  _selectedStep = index;
-                                });
-                              },
-                              borderRadius: BorderRadius.circular(12),
-                              child: Container(
-                                margin: const EdgeInsets.only(bottom: 4),
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                                decoration: BoxDecoration(
-                                  color: isSelected 
-                                      ? AppColors.primaryBlue.withOpacity(0.04) 
-                                      : Colors.transparent,
+            final steps = [
+              _ChronologyStep(
+                title: 'Abertura da Vaga',
+                subtitle: 'Publicada em ${widget.demand.date}',
+                icon: IconsaxPlusLinear.add_square,
+                status: _StepStatus.completed,
+                details: _buildAberturaDetails(),
+              ),
+              _ChronologyStep(
+                title: 'Captação & Cadastros',
+                subtitle: '$totalApplicants candidatos interessados',
+                icon: IconsaxPlusLinear.people,
+                status: totalApplicants > 0 ? _StepStatus.completed : _StepStatus.active,
+                details: _buildCaptacaoDetails(totalApplicants, apps),
+              ),
+              _ChronologyStep(
+                title: 'Carta de Apresentação',
+                subtitle: '$bioCount apresentações recebidas',
+                icon: IconsaxPlusLinear.document_text,
+                status: bioCount > 0 ? _StepStatus.completed : _StepStatus.active,
+                details: _buildCartaDetails(bioCount, apps),
+              ),
+              _ChronologyStep(
+                title: 'Treinamento Obrigatório',
+                subtitle: '$trainingCompleteCount concluíram o treinamento',
+                icon: IconsaxPlusLinear.teacher,
+                status: trainingCompleteCount > 0 ? _StepStatus.completed : _StepStatus.active,
+                details: _buildTreinamentoDetails(trainingCompleteCount, apps, letterMap),
+              ),
+              _ChronologyStep(
+                title: 'Aptos para Iniciar',
+                subtitle: '$approvedCount selecionados na triagem',
+                icon: IconsaxPlusLinear.shield_search,
+                status: approvedCount == widget.demand.totalVagas && approvedCount > 0
+                    ? _StepStatus.completed 
+                    : (approvedCount > 0 ? _StepStatus.active : _StepStatus.locked),
+                details: _buildAptosDetails(approvedCount, apps, letterMap),
+              ),
+              _ChronologyStep(
+                title: 'Na Loja no Dia',
+                subtitle: widget.demand.status == 'EM ANDAMENTO' || widget.demand.status == 'FINALIZADAS'
+                    ? 'Check-in validado com sucesso'
+                    : 'Aguardando data da diária',
+                icon: IconsaxPlusLinear.gps,
+                status: widget.demand.status == 'EM ANDAMENTO' || widget.demand.status == 'FINALIZADAS'
+                    ? _StepStatus.completed
+                    : _StepStatus.locked,
+                details: _buildPresencaDetails(apps),
+              ),
+              _ChronologyStep(
+                title: 'Ação Realizada',
+                subtitle: widget.demand.status == 'FINALIZADAS'
+                    ? 'Relatório final homologado'
+                    : 'Aguardando término do serviço',
+                icon: IconsaxPlusLinear.task,
+                status: widget.demand.status == 'FINALIZADAS' 
+                    ? _StepStatus.completed 
+                    : _StepStatus.locked,
+                details: _buildAcaoDetails(),
+              ),
+            ];
+
+            return Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.cardBorder),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(
+                    width: 380,
+                    child: Scrollbar(
+                      controller: _leftScrollCtrl,
+                      thumbVisibility: true,
+                      child: SingleChildScrollView(
+                        controller: _leftScrollCtrl,
+                        padding: const EdgeInsets.only(right: 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'CRONOLOGIA DA VAGA - ${widget.demand.storeName.toUpperCase()}',
+                              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: AppColors.textPrimary, letterSpacing: 0.5),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Acompanhe o funil de contratação e as etapas logísticas.',
+                              style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                            ),
+                            const SizedBox(height: 24),
+                            ListView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: steps.length,
+                              itemBuilder: (context, index) {
+                                final step = steps[index];
+                                final isSelected = _selectedStep == index;
+                                return InkWell(
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedStep = index;
+                                    });
+                                  },
                                   borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: isSelected 
-                                        ? AppColors.primaryBlue.withOpacity(0.15) 
-                                        : Colors.transparent,
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    _buildStatusBadge(step.status),
-                                    const SizedBox(width: 14),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            step.title,
-                                            style: TextStyle(
-                                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                                              fontSize: 13,
-                                              color: isSelected 
-                                                  ? AppColors.primaryBlue 
-                                                  : AppColors.textPrimary,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 3),
-                                          Text(
-                                            step.subtitle,
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: AppColors.textSecondary,
-                                            ),
-                                          ),
-                                        ],
+                                  child: Container(
+                                    margin: const EdgeInsets.only(bottom: 4),
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                                    decoration: BoxDecoration(
+                                      color: isSelected 
+                                          ? AppColors.primaryBlue.withOpacity(0.04) 
+                                          : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: isSelected 
+                                            ? AppColors.primaryBlue.withOpacity(0.15) 
+                                            : Colors.transparent,
                                       ),
                                     ),
-                                    Icon(
-                                      step.icon,
-                                      size: 18,
-                                      color: isSelected 
-                                          ? AppColors.primaryBlue 
-                                          : AppColors.textSecondary.withOpacity(0.6),
+                                    child: Row(
+                                      children: [
+                                        _buildStatusBadge(step.status),
+                                        const SizedBox(width: 14),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                step.title,
+                                                style: TextStyle(
+                                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                                                  fontSize: 13,
+                                                  color: isSelected 
+                                                      ? AppColors.primaryBlue 
+                                                      : AppColors.textPrimary,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 3),
+                                              Text(
+                                                step.subtitle,
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: AppColors.textSecondary,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        Icon(
+                                          step.icon,
+                                          size: 18,
+                                          color: isSelected 
+                                              ? AppColors.primaryBlue 
+                                              : AppColors.textSecondary.withOpacity(0.6),
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 32),
-              
-              // Divider line
-              Container(width: 1, color: AppColors.cardBorder),
-              const SizedBox(width: 32),
-
-              // Right Column: Detail Panel
-              Expanded(
-                child: Scrollbar(
-                  controller: _rightScrollCtrl,
-                  thumbVisibility: true,
-                  child: SingleChildScrollView(
-                    controller: _rightScrollCtrl,
-                    padding: const EdgeInsets.only(right: 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: AppColors.primaryBlue.withOpacity(0.03),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppColors.primaryBlue.withOpacity(0.1)),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(steps[_selectedStep].icon, color: AppColors.primaryBlue),
-                              const SizedBox(width: 12),
-                              Text(
-                                'Detalhes: ${steps[_selectedStep].title}',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.primaryBlue),
+                  const SizedBox(width: 32),
+                  Container(width: 1, color: AppColors.cardBorder),
+                  const SizedBox(width: 32),
+                  Expanded(
+                    child: Scrollbar(
+                      controller: _rightScrollCtrl,
+                      thumbVisibility: true,
+                      child: SingleChildScrollView(
+                        controller: _rightScrollCtrl,
+                        padding: const EdgeInsets.only(right: 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: AppColors.primaryBlue.withOpacity(0.03),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: AppColors.primaryBlue.withOpacity(0.1)),
                               ),
-                            ],
-                          ),
+                              child: Row(
+                                children: [
+                                  Icon(steps[_selectedStep].icon, color: AppColors.primaryBlue),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    'Detalhes: ${steps[_selectedStep].title}',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.primaryBlue),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            steps[_selectedStep].details,
+                          ],
                         ),
-                        const SizedBox(height: 24),
-                        steps[_selectedStep].details,
-                      ],
+                      ),
                     ),
                   ),
-                ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -4268,53 +4544,220 @@ class _VacancyChronologyState extends State<VacancyChronology> {
     );
   }
 
-  Widget _buildCaptacaoDetails(int total) {
-    // Generate some mock history dates for the chart based on the demand date
-    final dates = <String>[];
-    for (int i = 4; i >= 0; i--) {
-      dates.add('D-$i');
+  Widget _buildCaptacaoDetails(int total, List<QueryDocumentSnapshot> apps) {
+    if (apps.isEmpty) {
+      return _buildSubEmptyState('Nenhum candidato interessado nesta vaga até o momento.');
     }
-    // Proportional mock values based on total
-    final mockValues = <double>[];
-    if (total == 0) {
-      mockValues.addAll([0, 0, 0, 0, 0]);
-    } else {
-      mockValues.addAll([
-        (total * 0.1).ceilToDouble(),
-        (total * 0.25).ceilToDouble(),
-        (total * 0.5).ceilToDouble(),
-        (total * 0.8).ceilToDouble(),
-        total.toDouble(),
-      ]);
-    }
+
+    final allChecked = apps.every((app) => _selectedAppIds.contains(app.id));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            _buildStatCard('Total de Inscritos', total.toString(), AppColors.primaryBlue),
-            const SizedBox(width: 16),
-            _buildStatCard('Meta de Atração', '${widget.demand.totalVagas * 4} candidatos', AppColors.textSecondary),
-          ],
-        ),
-        const SizedBox(height: 24),
-        const Text(
-          'Evolução Diária de Candidaturas (Histórico)',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: AppColors.primaryBlue.withOpacity(0.04),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.primaryBlue.withOpacity(0.1)),
+          ),
+          child: Row(
+            children: [
+              Checkbox(
+                value: allChecked,
+                activeColor: AppColors.primaryBlue,
+                onChanged: (val) {
+                  setState(() {
+                    if (val == true) {
+                      _selectedAppIds.addAll(apps.map((app) => app.id));
+                    } else {
+                      _selectedAppIds.clear();
+                    }
+                  });
+                },
+              ),
+              const Text(
+                'Selecionar Todos',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
+              ),
+              const Spacer(),
+              ElevatedButton.icon(
+                onPressed: _selectedAppIds.isEmpty
+                    ? null
+                    : () async {
+                        final selectedApps = apps.where((app) => _selectedAppIds.contains(app.id)).toList();
+                        await _transitionApplicants(selectedApps, 'treinamento');
+                        setState(() {
+                          _selectedAppIds.clear();
+                        });
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Candidatos enviados para treinamento e cartas de 1 dia geradas.'),
+                            backgroundColor: AppColors.success,
+                          ),
+                        );
+                      },
+                icon: const Icon(IconsaxPlusLinear.teacher, size: 14, color: Colors.white),
+                label: const Text('ENVIAR PARA TREINAMENTO', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryBlue,
+                  disabledBackgroundColor: Colors.grey[300],
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                ),
+              ),
+              const SizedBox(width: 12),
+              ElevatedButton.icon(
+                onPressed: _selectedAppIds.isEmpty
+                    ? null
+                    : () async {
+                        final selectedApps = apps.where((app) => _selectedAppIds.contains(app.id)).toList();
+                        await _transitionApplicants(selectedApps, 'aprovado');
+                        setState(() {
+                          _selectedAppIds.clear();
+                        });
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Candidatos aprovados direto e cartas de diária de 3 dias geradas.'),
+                            backgroundColor: AppColors.success,
+                          ),
+                        );
+                      },
+                icon: const Icon(Icons.verified, size: 14, color: Colors.white),
+                label: const Text('APROVAR DIRETO (APTO)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.success,
+                  disabledBackgroundColor: Colors.grey[300],
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 16),
-        Card(
-          color: AppColors.background,
-          elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: AppColors.cardBorder)),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: CustomHistogram(
-              values: mockValues,
-              labels: dates,
-            ),
-          ),
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: apps.length,
+          itemBuilder: (context, index) {
+            final app = apps[index];
+            final appData = app.data() as Map<String, dynamic>;
+            final String cpf = appData['promoterCpf'] ?? '';
+            final String currentStatus = appData['status'] ?? '';
+            final isSelected = _selectedAppIds.contains(app.id);
+
+            final promoter = widget.promoterMap[cpf];
+            if (promoter == null) return const SizedBox.shrink();
+
+            final String name = promoter['name'] ?? '';
+            final bool hasGoldSeal = promoter['trainingCompleted'] == true || promoter['atacadaoExperience'] == true;
+
+            return Card(
+              color: Colors.white,
+              elevation: 0,
+              margin: const EdgeInsets.only(bottom: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: const BorderSide(color: AppColors.cardBorder)),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(
+                  children: [
+                    Checkbox(
+                      value: isSelected,
+                      activeColor: AppColors.primaryBlue,
+                      onChanged: (val) {
+                        setState(() {
+                          if (val == true) {
+                            _selectedAppIds.add(app.id);
+                          } else {
+                            _selectedAppIds.remove(app.id);
+                          }
+                        });
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    const CircleAvatar(
+                      radius: 18,
+                      backgroundColor: AppColors.background,
+                      child: Icon(Icons.person, color: AppColors.primaryBlue, size: 18),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                name,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
+                              ),
+                              if (hasGoldSeal) ...[
+                                const SizedBox(width: 6),
+                                Tooltip(
+                                  message: 'Selo Dourado: Treinamento ou Vivência Atacadão concluído',
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.amber[100],
+                                      border: Border.all(color: Colors.amber[700]!, width: 1),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.stars, color: Colors.amber[800], size: 12),
+                                        const SizedBox(width: 2),
+                                        Text(
+                                          'Selo Dourado',
+                                          style: TextStyle(color: Colors.amber[900], fontSize: 9, fontWeight: FontWeight.bold),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Status atual: ${currentStatus.toUpperCase()}',
+                            style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(IconsaxPlusLinear.teacher, color: AppColors.primaryBlue, size: 20),
+                      tooltip: 'Enviar para Treinamento',
+                      onPressed: () async {
+                        await _transitionApplicants([app], 'treinamento');
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('$name enviado para treinamento (carta de 1 dia gerada).'),
+                            backgroundColor: AppColors.success,
+                          ),
+                        );
+                      },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.verified_outlined, color: AppColors.success, size: 20),
+                      tooltip: 'Aprovar Direto (Apto)',
+                      onPressed: () async {
+                        await _transitionApplicants([app], 'aprovado');
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('$name aprovado direto (carta de diárias de 3 dias gerada).'),
+                            backgroundColor: AppColors.success,
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         ),
       ],
     );
@@ -4377,7 +4820,7 @@ class _VacancyChronologyState extends State<VacancyChronology> {
     );
   }
 
-  Widget _buildTreinamentoDetails(int count, List<QueryDocumentSnapshot> apps) {
+  Widget _buildTreinamentoDetails(int count, List<QueryDocumentSnapshot> apps, Map<String, Map<String, dynamic>> letterMap) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -4400,6 +4843,8 @@ class _VacancyChronologyState extends State<VacancyChronology> {
                 if (promoter == null) return const SizedBox.shrink();
                 final isComplete = promoter['trainingCompleted'] == true || appData['status'] == 'aprovado';
 
+                final letter = letterMap["${cpf}_treinamento"];
+
                 return Container(
                   margin: const EdgeInsets.only(bottom: 10),
                   padding: const EdgeInsets.all(14),
@@ -4409,27 +4854,41 @@ class _VacancyChronologyState extends State<VacancyChronology> {
                     border: Border.all(color: AppColors.cardBorder),
                   ),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(promoter['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: AppColors.textPrimary)),
-                      Row(
-                        children: [
-                          Text(
-                            isComplete ? '100% Concluído' : '0% - Pendente',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: isComplete ? AppColors.success : AppColors.warning,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(promoter['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: AppColors.textPrimary)),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Text(
+                                  isComplete ? '100% Concluído' : '0% - Pendente',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: isComplete ? AppColors.success : AppColors.warning,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Icon(
+                                  isComplete ? Icons.check_circle : Icons.radio_button_unchecked,
+                                  color: isComplete ? AppColors.success : AppColors.warning,
+                                  size: 16,
+                                ),
+                              ],
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Icon(
-                            isComplete ? Icons.check_circle : Icons.radio_button_unchecked,
-                            color: isComplete ? AppColors.success : AppColors.warning,
-                            size: 16,
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
+                      if (letter != null)
+                        ElevatedButton.icon(
+                          onPressed: () => _printLetterFromData(letter),
+                          icon: const Icon(Icons.print, size: 14, color: Colors.white),
+                          label: const Text('IMPRIMIR CARTA', style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
+                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryBlue, elevation: 0),
+                        ),
                     ],
                   ),
                 );
@@ -4440,7 +4899,7 @@ class _VacancyChronologyState extends State<VacancyChronology> {
     );
   }
 
-  Widget _buildAptosDetails(int approvedCount, List<QueryDocumentSnapshot> apps) {
+  Widget _buildAptosDetails(int approvedCount, List<QueryDocumentSnapshot> apps, Map<String, Map<String, dynamic>> letterMap) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -4464,6 +4923,8 @@ class _VacancyChronologyState extends State<VacancyChronology> {
                 final isApproved = appData['status'] == 'aprovado' || appData['status'] == 'selecionado';
                 if (!isApproved) return const SizedBox.shrink();
 
+                final letter = letterMap["${cpf}_diarias"];
+
                 return Card(
                   color: Colors.white,
                   elevation: 0,
@@ -4476,16 +4937,29 @@ class _VacancyChronologyState extends State<VacancyChronology> {
                         const Icon(Icons.verified, color: AppColors.primaryBlue, size: 18),
                         const SizedBox(width: 10),
                         Expanded(
-                          child: Text(
-                            promoter['name'] ?? '',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.textPrimary),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                promoter['name'] ?? '',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.textPrimary),
+                              ),
+                              const SizedBox(height: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(color: Colors.blue.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
+                                child: const Text('ALOCADO', style: TextStyle(color: AppColors.primaryBlue, fontSize: 9, fontWeight: FontWeight.bold)),
+                              ),
+                            ],
                           ),
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(color: Colors.blue.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
-                          child: const Text('ALOCADO', style: TextStyle(color: AppColors.primaryBlue, fontSize: 9, fontWeight: FontWeight.bold)),
-                        ),
+                        if (letter != null)
+                          ElevatedButton.icon(
+                            onPressed: () => _printLetterFromData(letter),
+                            icon: const Icon(Icons.print, size: 14, color: Colors.white),
+                            label: const Text('IMPRIMIR CARTA', style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
+                            style: ElevatedButton.styleFrom(backgroundColor: AppColors.success, elevation: 0),
+                          ),
                       ],
                     ),
                   ),
@@ -4497,8 +4971,14 @@ class _VacancyChronologyState extends State<VacancyChronology> {
     );
   }
 
-  Widget _buildPresencaDetails() {
-    final hasCheckIn = widget.demand.status == 'EM ANDAMENTO' || widget.demand.status == 'FINALIZADAS';
+  Widget _buildPresencaDetails(List<QueryDocumentSnapshot> apps) {
+    final linkedApps = apps.where((app) {
+      final appData = app.data() as Map<String, dynamic>;
+      final status = appData['status'] ?? '';
+      final checkInTime = appData['checkInTime'] ?? '';
+      return status == 'aprovado' || status == 'selecionado' || status == 'em_andamento' || status == 'em_analise' || checkInTime.toString().isNotEmpty;
+    }).toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -4511,32 +4991,120 @@ class _VacancyChronologyState extends State<VacancyChronology> {
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
         ),
         const SizedBox(height: 16),
-        if (!hasCheckIn)
-          _buildSubEmptyState('Aguardando check-in no dia de trabalho.')
+        if (linkedApps.isEmpty)
+          _buildSubEmptyState('Nenhum promotor alocado ou presente nesta vaga ainda.')
         else
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.green.withOpacity(0.06),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.green.withOpacity(0.15)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.gps_fixed, color: AppColors.success, size: 20),
-                    const SizedBox(width: 10),
-                    const Text('CHECK-IN REALIZADO', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.success)),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Prestador chegou na loja e realizou check-in validado via GPS às ${widget.demand.entryTime ?? "08:00"}.',
-                  style: const TextStyle(fontSize: 12, color: AppColors.textPrimary, height: 1.4),
-                ),
-              ],
+          SizedBox(
+            height: 350,
+            child: ListView.builder(
+              itemCount: linkedApps.length,
+              itemBuilder: (context, index) {
+                final appData = linkedApps[index].data() as Map<String, dynamic>;
+                final String cpf = appData['promoterCpf'] ?? '';
+                final promoter = widget.promoterMap[cpf];
+                if (promoter == null) return const SizedBox.shrink();
+
+                final checkInTime = appData['checkInTime'] ?? '';
+                final checkOutTime = appData['checkOutTime'] ?? '';
+                final status = appData['status'] ?? '';
+
+                Color statusColor;
+                String statusText;
+                IconData statusIcon;
+
+                if (checkOutTime.toString().isNotEmpty) {
+                  statusColor = Colors.blue;
+                  statusText = 'Checkout Realizado';
+                  statusIcon = Icons.logout;
+                } else if (checkInTime.toString().isNotEmpty || status == 'em_andamento') {
+                  statusColor = Colors.green;
+                  statusText = 'Em Loja (Checked-in)';
+                  statusIcon = Icons.login;
+                } else {
+                  statusColor = Colors.red;
+                  statusText = 'Check-in Pendente';
+                  statusIcon = Icons.timer_outlined;
+                }
+
+                String formattedCheckIn = '';
+                if (checkInTime.toString().isNotEmpty) {
+                  try {
+                    formattedCheckIn = DateFormat("HH:mm").format(DateTime.parse(checkInTime));
+                  } catch (_) {
+                    formattedCheckIn = checkInTime.toString();
+                  }
+                }
+
+                String formattedCheckOut = '';
+                if (checkOutTime.toString().isNotEmpty) {
+                  try {
+                    formattedCheckOut = DateFormat("HH:mm").format(DateTime.parse(checkOutTime));
+                  } catch (_) {
+                    formattedCheckOut = checkOutTime.toString();
+                  }
+                }
+
+                return Card(
+                  color: Colors.white,
+                  elevation: 0,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: const BorderSide(color: AppColors.cardBorder)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: statusColor.withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(statusIcon, color: statusColor, size: 20),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                promoter['name'] ?? '',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    statusText,
+                                    style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            if (formattedCheckIn.isNotEmpty)
+                              Text('Check-in: $formattedCheckIn', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                            if (formattedCheckOut.isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text('Check-out: $formattedCheckOut', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.blue)),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
           ),
       ],
@@ -4556,9 +5124,7 @@ class _VacancyChronologyState extends State<VacancyChronology> {
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
         ),
         const SizedBox(height: 16),
-        if (!hasReport)
-          _buildSubEmptyState('Aguardando a conclusão dos serviços na loja.')
-        else
+        if (hasReport)
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -4573,17 +5139,62 @@ class _VacancyChronologyState extends State<VacancyChronology> {
                   children: [
                     const Icon(Icons.analytics_outlined, color: AppColors.success, size: 20),
                     const SizedBox(width: 10),
-                    const Text('AÇÃO HOMOLOGADA', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.success)),
+                    const Text('AÇÃO HOMOLOGADA & FINALIZADA', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.success)),
                   ],
                 ),
                 const SizedBox(height: 12),
                 const Text(
-                  'O promotor alocado concluiu as atividades obrigatórias, preencheu a pesquisa de campo e realizou o check-out. O saldo foi liberado para pagamento.',
+                  'O promotor alocado concluiu as atividades obrigatórias, preencheu a pesquisa de campo e realizou o check-out. O saldo foi liberado para pagamento e a demanda está finalizada.',
                   style: TextStyle(fontSize: 12, color: AppColors.textPrimary, height: 1.4),
                 ),
               ],
             ),
+          )
+        else ...[
+          _buildSubEmptyState('Aguardando a conclusão dos serviços na loja ou homologação.'),
+          const SizedBox(height: 20),
+          ElevatedButton.icon(
+            onPressed: () async {
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => const Center(child: CircularProgressIndicator(color: AppColors.primaryBlue)),
+              );
+              try {
+                await FirebaseFirestore.instance
+                    .collection('demands')
+                    .doc(widget.demand.id)
+                    .update({'status': 'FINALIZADAS'});
+                if (context.mounted) {
+                  Navigator.pop(context); // Fechar loading
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Demanda finalizada com sucesso!'),
+                      backgroundColor: AppColors.success,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Erro ao finalizar demanda: $e'),
+                      backgroundColor: AppColors.error,
+                    ),
+                  );
+                }
+              }
+            },
+            icon: const Icon(Icons.check_circle_outline, size: 18, color: Colors.white),
+            label: const Text('FINALIZAR AÇÃO', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryBlue,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
           ),
+        ],
       ],
     );
   }

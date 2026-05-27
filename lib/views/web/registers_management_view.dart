@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/constants/premium_theme.dart';
 import '../../core/data/test_database.dart';
 import '../../core/services/register_service.dart';
@@ -47,8 +48,50 @@ class _RegistersManagementViewState extends State<RegistersManagementView> with 
     _loadData();
   }
 
+  Future<void> _seedAtacadaoQuestionnaire() async {
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('questionnaires')
+          .where('name', isEqualTo: 'Frente de Caixa | Atacadão')
+          .get();
+      if (snap.docs.isEmpty) {
+        final id = FirebaseFirestore.instance.collection('questionnaires').doc().id;
+        final newQuest = {
+          'id': id,
+          'name': 'Frente de Caixa | Atacadão',
+          'questions': [
+            {
+              'questionText': 'Está de acordo com os detalhes da vaga?',
+              'type': 'Sim/Não',
+              'options': ['Sim', 'Não'],
+            },
+            {
+              'questionText': 'Já trabalhou como frente de caixa?',
+              'type': 'Sim/Não',
+              'options': ['Sim', 'Não'],
+            },
+            {
+              'questionText': 'Já fez o treinamento do Atacadão?',
+              'type': 'Sim/Não',
+              'options': ['Sim', 'Não'],
+            },
+            {
+              'questionText': 'Já teve contato com o sistema de caixa do Atacadão?',
+              'type': 'Sim/Não',
+              'options': ['Sim', 'Não'],
+            },
+          ]
+        };
+        await FirebaseFirestore.instance.collection('questionnaires').doc(id).set(newQuest);
+      }
+    } catch (e) {
+      print('Erro ao semear questionário: $e');
+    }
+  }
+
   Future<void> _loadData() async {
     try {
+      await _seedAtacadaoQuestionnaire();
       final clients = await _api.getClients().catchError((e) { print('Erro clients: $e'); return <AppClient>[]; });
       final projects = await _api.getProjects().catchError((e) { print('Erro projects: $e'); return <AppProject>[]; });
       final stores = await _api.getStores().catchError((e) { print('Erro stores: $e'); return <AppStore>[]; });

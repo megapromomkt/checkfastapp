@@ -41,6 +41,7 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
   final _api = RegisterService();
   List<AppDemand> _realDemands = [];
   bool _isLoadingDemands = true;
+  Map<String, String> _appliedDemandStatuses = {};
 
   int _opportunityCount = 12;
   
@@ -772,19 +773,31 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
       final demands = await _api.getDemands();
       final List<AppDemand> filtered = [];
       
+      final applicationsSnap = await FirebaseFirestore.instance
+          .collection('applications')
+          .where('promoterCpf', isEqualTo: _userCpf)
+          .get();
+      final Map<String, String> appliedDemandStatuses = {};
+      for (var doc in applicationsSnap.docs) {
+        final data = doc.data();
+        final demandId = data['demandId'] ?? '';
+        final status = data['status'] ?? '';
+        if (demandId.isNotEmpty) {
+          appliedDemandStatuses[demandId] = status;
+        }
+      }
+
       for (var d in demands) {
         if (d.status != 'ABERTAS') continue;
         
         bool isWithinRange = false;
         double dist = 99999.0;
         
-        // 1. Se ambos têm coordenadas válidas (não nulas e não zero), calculamos o raio geográfico com base no raio selecionado
         if (d.latitude != null && d.longitude != null && d.latitude != 0.0 && d.longitude != 0.0 &&
             _userLat != 0.0 && _userLon != 0.0) {
           dist = _calculateDistance(_userLat, _userLon, d.latitude!, d.longitude!);
           isWithinRange = (dist <= _selectedRadius);
         } else {
-          // 2. Fallback textual por Cidade: se não houver coordenadas, filtramos comparando com o endereço cadastrado
           if (_userCity.isNotEmpty) {
             final cleanUserCity = _userCity.toLowerCase().trim();
             final cleanDemandAddress = d.address.toLowerCase().trim();
@@ -792,8 +805,6 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
             
             final bool matchesCity = cleanDemandAddress.contains(cleanUserCity) || cleanStoreName.contains(cleanUserCity);
             
-            // Se for São Paulo (cidade gigante), e tivermos o bairro cadastrado, filtramos de forma mais restrita para evitar falsos positivos
-            // Se o usuário selecionou um raio maior que 30km, removemos a restrição de bairro para mostrar todas as vagas
             if (matchesCity && cleanUserCity == 'são paulo' && _userBairro.isNotEmpty && _selectedRadius < 30.0) {
               final cleanBairro = _userBairro.toLowerCase().trim();
               isWithinRange = cleanDemandAddress.contains(cleanBairro) || cleanStoreName.contains(cleanBairro);
@@ -801,7 +812,6 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
               isWithinRange = matchesCity;
             }
           } else {
-            // Se o usuário não tem cidade no cadastro, mostramos como fallback
             isWithinRange = true;
           }
         }
@@ -848,7 +858,6 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
         }
       }
 
-      // Ordenar as demandas da mais próxima para a mais longe
       filtered.sort((a, b) {
         final double distA = double.tryParse(a.distance.split(' ').first) ?? 99999.0;
         final double distB = double.tryParse(b.distance.split(' ').first) ?? 99999.0;
@@ -858,6 +867,7 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
       setState(() {
         _realDemands = filtered;
         _opportunityCount = _realDemands.length;
+        _appliedDemandStatuses = appliedDemandStatuses;
         _isLoadingDemands = false;
       });
     } catch (e) {
@@ -877,6 +887,102 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
           c(lat1 * p) * c(lat2 * p) * 
           (1 - c((lon2 - lon1) * p)) / 2;
     return 12742 * math.asin(math.sqrt(a));
+  }
+
+  void _showNotificationsBottomSheet(BuildContext context, List<AppDemand> pendingDemands) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Alertas e Questionários Pendentes',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (pendingDemands.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(
+                    child: Text(
+                      'Tudo em dia! Nenhum questionário pendente.',
+                      style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                    ),
+                  ),
+                )
+              else
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: pendingDemands.length,
+                    itemBuilder: (ctx, idx) {
+                      final d = pendingDemands[idx];
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: const BorderSide(color: AppColors.cardBorder)),
+                        elevation: 0,
+                        color: AppColors.background,
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          leading: const CircleAvatar(
+                            backgroundColor: Colors.amberAccent,
+                            child: Icon(Icons.assignment_turned_in, color: Colors.amber),
+                          ),
+                          title: Text(
+                            d.storeName,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
+                          ),
+                          subtitle: Text(
+                            'Questionário pendente para aceitar a vaga de ${d.role}.',
+                            style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                          ),
+                          trailing: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primaryBlue,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                            ),
+                            onPressed: () {
+                              Navigator.pop(context); // fechar bottomsheet
+                              DemandOnboardingFlow.show(
+                                context,
+                                demand: d,
+                                userCpf: _userCpf,
+                              ).then((_) {
+                                _updateOpportunityCount();
+                              });
+                            },
+                            child: const Text('RESPONDER', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   String _getInitials(String name) {
@@ -942,14 +1048,28 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
           const SizedBox(width: 12),
           Row(
             children: [
-              Container(
-                padding: EdgeInsets.all(mobile ? 8 : 12),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.cardBorder),
-                ),
-                child: Icon(IconsaxPlusLinear.notification, color: AppColors.textPrimary, size: mobile ? 20 : 24),
+              Builder(
+                builder: (context) {
+                  final pendingDemands = _realDemands.where((d) => d.status == 'ABERTAS' && !_appliedDemandStatuses.containsKey(d.id)).toList();
+                  return InkWell(
+                    onTap: () => _showNotificationsBottomSheet(context, pendingDemands),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Badge(
+                      isLabelVisible: pendingDemands.isNotEmpty,
+                      label: Text('${pendingDemands.length}'),
+                      backgroundColor: Colors.red,
+                      child: Container(
+                        padding: EdgeInsets.all(mobile ? 8 : 12),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.cardBorder),
+                        ),
+                        child: Icon(IconsaxPlusLinear.notification, color: AppColors.textPrimary, size: mobile ? 20 : 24),
+                      ),
+                    ),
+                  );
+                }
               ),
               SizedBox(width: mobile ? 10 : 16),
               InkWell(
@@ -1891,24 +2011,36 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
                       child: const Text('DETALHES', style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w800))
                     ),
                     const SizedBox(width: 12),
-                    ElevatedButton(
-                      onPressed: () {
-                        if (demand != null) {
-                          DemandOnboardingFlow.show(
-                            context,
-                            demand: demand,
-                            userCpf: _userCpf,
-                          );
-                        }
-                      }, 
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryBlue, 
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16), 
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
-                      ), 
-                      child: const Text('ACEITAR', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12))
+                    Builder(
+                      builder: (context) {
+                        final bool isApplied = demand != null && _appliedDemandStatuses.containsKey(demand.id);
+                        final String buttonText = isApplied ? 'EM ANÁLISE' : 'ACEITAR';
+                        final Color buttonColor = isApplied ? Colors.amber : AppColors.primaryBlue;
+
+                        return ElevatedButton(
+                          onPressed: isApplied ? null : () {
+                            if (demand != null) {
+                              DemandOnboardingFlow.show(
+                                context,
+                                demand: demand,
+                                userCpf: _userCpf,
+                              ).then((_) {
+                                _updateOpportunityCount();
+                              });
+                            }
+                          }, 
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: buttonColor, 
+                            foregroundColor: isApplied ? Colors.black87 : Colors.white,
+                            disabledBackgroundColor: isApplied ? Colors.amber : Colors.grey[300],
+                            disabledForegroundColor: isApplied ? Colors.black87 : Colors.grey[500],
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16), 
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
+                          ), 
+                          child: Text(buttonText, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12))
+                        );
+                      }
                     ),
                   ],
                 ),

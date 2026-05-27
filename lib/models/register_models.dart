@@ -1047,6 +1047,8 @@ class AppUser {
   String? addressBairro;
   String? addressRua;
   String? addressCep;
+  bool trainingCompleted;
+  bool atacadaoExperience;
 
   AppUser({
     required this.id,
@@ -1070,6 +1072,8 @@ class AppUser {
     this.addressBairro,
     this.addressRua,
     this.addressCep,
+    this.trainingCompleted = false,
+    this.atacadaoExperience = false,
   });
 
   Map<String, dynamic> toMap() {
@@ -1095,6 +1099,8 @@ class AppUser {
       'address_bairro': addressBairro,
       'address_rua': addressRua,
       'address_cep': addressCep,
+      'trainingCompleted': trainingCompleted,
+      'atacadaoExperience': atacadaoExperience,
     };
   }
 
@@ -1121,6 +1127,8 @@ class AppUser {
       addressBairro: map['address_bairro'] ?? map['bairro'],
       addressRua: map['address_rua'] ?? map['rua'],
       addressCep: map['address_cep'] ?? map['cep'],
+      trainingCompleted: map['trainingCompleted'] ?? map['training_completed'] ?? false,
+      atacadaoExperience: map['atacadaoExperience'] ?? map['atacadao_experience'] ?? false,
     );
   }
 }

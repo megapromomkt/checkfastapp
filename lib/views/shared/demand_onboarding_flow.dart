@@ -599,21 +599,42 @@ class _OnboardingDialogState extends State<_OnboardingDialog> {
     );
 
     try {
-      // 1. Salvar currículo atualizado via SDK
-      await FirebaseFirestore.instance.collection('users').doc(widget.userCpf).update({
-        'curriculum_completo_dados': jsonEncode(_curriculumData),
-      });
-
-      // 2. Salvar inscrição na coleção 'applications' com status tarefa_aprovada via SDK
+      bool trainingCompleted = false;
+      bool atacadaoExperience = false;
+      
       final answersMap = <String, dynamic>{};
       for (int i = 0; i < _questions.length; i++) {
         final q = _questions[i];
+        final questionText = q['questionText']?.toString() ?? '';
+        final answer = _answers[i] ?? '';
+        
         answersMap['q$i'] = {
-          'question': q['questionText']?.toString() ?? '',
-          'answer': _answers[i] ?? '',
+          'question': questionText,
+          'answer': answer,
         };
+
+        if (questionText.contains('Já fez o treinamento do Atacadão?') && answer == 'Sim') {
+          trainingCompleted = true;
+        }
+        if (questionText.contains('Já teve contato com o sistema de caixa do Atacadão?') && answer == 'Sim') {
+          atacadaoExperience = true;
+        }
       }
 
+      final Map<String, dynamic> userUpdates = {
+        'curriculum_completo_dados': jsonEncode(_curriculumData),
+      };
+      if (trainingCompleted) {
+        userUpdates['trainingCompleted'] = true;
+      }
+      if (atacadaoExperience) {
+        userUpdates['atacadaoExperience'] = true;
+      }
+
+      // 1. Salvar currículo atualizado e flags de selo dourado via SDK
+      await FirebaseFirestore.instance.collection('users').doc(widget.userCpf).update(userUpdates);
+
+      // 2. Salvar inscrição na coleção 'applications' com status tarefa_aprovada via SDK
       final now = DateTime.now().toIso8601String();
       await FirebaseFirestore.instance.collection('applications').add({
         'promoterCpf': widget.userCpf,
