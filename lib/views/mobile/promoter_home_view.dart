@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import '../../core/constants/premium_theme.dart';
+import '../../models/app_models.dart';
 import 'daily_execution_view.dart';
 import 'check_in_tab_view.dart';
 import 'store_detail_view.dart';
@@ -629,7 +630,26 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
                 Row(
                   children: [
                     TextButton(
-                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => StoreDetailView(storeName: name, network: network))), 
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => StoreDetailView(
+                            demand: AppDemand(
+                              id: '',
+                              storeName: name,
+                              network: network,
+                              address: 'Rua Gago Coutinho, 350 - Lapa, SP',
+                              role: 'Promotor',
+                              distance: dist,
+                              timeRange: '08h-14h',
+                              value: double.tryParse(val.replaceAll('R\$', '').replaceAll(',', '.').trim()) ?? 150.0,
+                              date: tag,
+                              urgency: tag,
+                              status: 'ABERTAS',
+                            ),
+                          ),
+                        ),
+                      ), 
                       child: const Text('DETALHES', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold))
                     ),
                     const SizedBox(width: 5),
@@ -662,7 +682,26 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
       child: InkWell(
         onTap: () {
           if (status == 'AGENDADA') {
-            Navigator.push(context, MaterialPageRoute(builder: (context) => StoreDetailView(storeName: loc, network: network)));
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => StoreDetailView(
+                  demand: AppDemand(
+                    id: '',
+                    storeName: loc,
+                    network: network,
+                    address: 'Rua Gago Coutinho, 350 - Lapa, SP',
+                    role: 'Promotor',
+                    distance: '1.2 KM',
+                    timeRange: '08h-14h',
+                    value: 150.0,
+                    date: date,
+                    urgency: 'Média',
+                    status: 'AGENDADA',
+                  ),
+                ),
+              ),
+            );
           } else if (status != 'CANCELADA') {
             Navigator.push(context, MaterialPageRoute(builder: (context) => TaskTimelineView(storeName: loc, status: status)));
           }

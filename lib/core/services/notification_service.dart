@@ -1,5 +1,6 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:geolocator/geolocator.dart';
+import 'dart:ui';
 import 'location_service.dart';
 
 class NotificationService {
@@ -24,7 +25,7 @@ class NotificationService {
       'Alertas de Risco',
       importance: Importance.max,
       priority: Priority.high,
-      color: 0xFFD32F2F, // Red Alert
+      color: Color(0xFFD32F2F), // Red Alert
     );
     const NotificationDetails platformChannelSpecifics =
         NotificationDetails(android: androidPlatformChannelSpecifics);

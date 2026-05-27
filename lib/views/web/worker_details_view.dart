@@ -201,7 +201,7 @@ class _GeneralInfoTab extends StatelessWidget {
     padding: const EdgeInsets.symmetric(vertical: 12), 
     child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
       Text(l, style: const TextStyle(color: AppColors.textSecondary, fontSize: 11)), 
-      Text(v, style: TextStyle(color: isSuccess ? AppColors.successEmerald : Colors.white, fontWeight: FontWeight.bold))
+      Text(v, style: TextStyle(color: isSuccess ? AppColors.success : Colors.white, fontWeight: FontWeight.bold))
     ])
   );
 }
@@ -232,7 +232,7 @@ class _HistoryTab extends StatelessWidget {
       itemCount: 5, 
       separatorBuilder: (_, __) => const Divider(color: Colors.white10), 
       itemBuilder: (c, i) => ListTile(
-        leading: const Icon(Icons.check_circle_outline, color: AppColors.successEmerald),
+        leading: const Icon(Icons.check_circle_outline, color: AppColors.success),
         title: Text('Check-in Loja Atacadão #$i', style: const TextStyle(color: Colors.white, fontSize: 13)),
         subtitle: const Text('Localização validada e foto auditada.', style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
       )
@@ -253,7 +253,7 @@ class _FinancialTab extends StatelessWidget {
         const SizedBox(height: 20),
         ElevatedButton(
           onPressed: () {}, 
-          style: ElevatedButton.styleFrom(backgroundColor: AppColors.successEmerald, padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15)),
+          style: ElevatedButton.styleFrom(backgroundColor: AppColors.success, padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15)),
           child: const Text('LIBERAR PAGAMENTO PIX', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         ),
       ],

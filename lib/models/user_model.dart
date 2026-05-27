@@ -15,6 +15,11 @@ class UserModel {
   final List<String>? demandHistory; // IDs de demandas concluídas
   final List<Map<String, dynamic>>? paymentHistory; // [{'amount': 150, 'date': '...', 'status': 'Paid'}]
   final DateTime createdAt;
+  final String? birthDate;
+  final Map<String, dynamic>? address;
+  final Map<String, dynamic>? emergencyContact;
+  final Map<String, dynamic>? bankAccount;
+  final String? password;
 
   UserModel({
     required this.id,
@@ -33,6 +38,11 @@ class UserModel {
     this.demandHistory,
     this.paymentHistory,
     required this.createdAt,
+    this.birthDate,
+    this.address,
+    this.emergencyContact,
+    this.bankAccount,
+    this.password,
   });
 
   Map<String, dynamic> toMap() {
@@ -53,6 +63,11 @@ class UserModel {
       'demandHistory': demandHistory,
       'paymentHistory': paymentHistory,
       'createdAt': createdAt.toIso8601String(),
+      'birthDate': birthDate,
+      'address': address,
+      'emergencyContact': emergencyContact,
+      'bankAccount': bankAccount,
+      'password': password,
     };
   }
 
@@ -74,6 +89,11 @@ class UserModel {
       demandHistory: map['demandHistory'] != null ? List<String>.from(map['demandHistory']) : null,
       paymentHistory: map['paymentHistory'] != null ? List<Map<String, dynamic>>.from(map['paymentHistory']) : null,
       createdAt: DateTime.tryParse(map['createdAt'] ?? '') ?? DateTime.now(),
+      birthDate: map['birthDate'],
+      address: map['address'] != null ? Map<String, dynamic>.from(map['address']) : null,
+      emergencyContact: map['emergencyContact'] != null ? Map<String, dynamic>.from(map['emergencyContact']) : null,
+      bankAccount: map['bankAccount'] != null ? Map<String, dynamic>.from(map['bankAccount']) : null,
+      password: map['password'],
     );
   }
 }

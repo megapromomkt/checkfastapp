@@ -90,14 +90,14 @@ class TestDatabase {
     ];
 
     projects = [
-      AppProject(id: 'p1', name: 'Reposição Verão', clientId: 'c1', type: 'Exclusivo', paymentModel: 'Diária', defaultValue: 150.0),
-      AppProject(id: 'p2', name: 'Lançamento Dove', clientId: 'c1', type: 'Compartilhado', paymentModel: 'Hora', defaultValue: 25.0, minHours: 4),
-      AppProject(id: 'p3', name: 'Degustação KitKat', clientId: 'c2', type: 'Exclusivo', paymentModel: 'Diária', defaultValue: 180.0),
+      AppProject(id: 'p1', name: 'Reposição Verão', clientId: 'c1', type: 'Exclusivo', paymentModel: 'Diária', projectValue: 150.0),
+      AppProject(id: 'p2', name: 'Lançamento Dove', clientId: 'c1', type: 'Compartilhado', paymentModel: 'Hora', projectValue: 25.0),
+      AppProject(id: 'p3', name: 'Degustação KitKat', clientId: 'c2', type: 'Exclusivo', paymentModel: 'Diária', projectValue: 180.0),
     ];
 
     stores = [
-      AppStore(id: 's1', name: 'Atacadão Lapa', clientId: 'c1', address: 'Av. das Nações Unidas, 123', city: 'São Paulo', state: 'SP', responsible: 'Gerente Marcos'),
-      AppStore(id: 's2', name: 'Carrefour Osasco', clientId: 'c3', address: 'Av. dos Autonomistas, 456', city: 'Osasco', state: 'SP', responsible: 'Gerente Ana'),
+      AppStore(id: 's1', name: 'Atacadão Lapa', clientId: 'c1', logradouro: 'Av. das Nações Unidas, 123', city: 'São Paulo', state: 'SP'),
+      AppStore(id: 's2', name: 'Carrefour Osasco', clientId: 'c3', logradouro: 'Av. dos Autonomistas, 456', city: 'Osasco', state: 'SP'),
     ];
 
     roles = [
@@ -106,8 +106,8 @@ class TestDatabase {
     ];
 
     paymentRules = [
-      AppPaymentRule(id: 'pr1', name: 'Diária Padrão', type: 'Diária', baseValue: 120.0, minHours: 8, allowException: false),
-      AppPaymentRule(id: 'pr2', name: 'Hora Extra FDS', type: 'Hora', baseValue: 25.0, minHours: 4, allowException: true),
+      AppPaymentRule(id: 'pr1', name: 'Diária Padrão', type: 'Padrão', baseValue: 120.0, measurementType: 'Por diária'),
+      AppPaymentRule(id: 'pr2', name: 'Hora Extra FDS', type: 'Extra', baseValue: 25.0, measurementType: 'Por hora'),
     ];
 
     demandModels = [

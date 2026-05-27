@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../core/constants/premium_theme.dart';
 import '../../core/data/test_database.dart';
 import '../../models/app_models.dart';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class PresenceControlView extends StatefulWidget {
   const PresenceControlView({super.key});
@@ -11,55 +13,93 @@ class PresenceControlView extends StatefulWidget {
 }
 
 class _PresenceControlViewState extends State<PresenceControlView> {
+  List<AppPresence> _presences = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPresences();
+  }
+
+  Future<void> _loadPresences() async {
+    final db = TestDatabase.instance;
+    final basePresences = db.presenceRecords;
+    
+    final prefs = await SharedPreferences.getInstance();
+    final presenceJson = prefs.getString('current_presence');
+    
+    setState(() {
+      _presences = List.from(basePresences);
+      if (presenceJson != null) {
+        final data = jsonDecode(presenceJson);
+        _presences.insert(0, AppPresence( // Insere no topo da lista
+          id: data['id'],
+          demandId: data['demandId'],
+          promoterName: data['promoterName'],
+          storeName: data['storeName'],
+          checkInTime: data['checkInTime'],
+          checkOutTime: data['checkOutTime'],
+          gpsValid: data['gpsValid'],
+          photoValid: data['photoValid'],
+          status: data['status'],
+        ));
+      }
+      _isLoading = false;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final db = TestDatabase.instance;
-    final presences = db.presenceRecords;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start, 
       children: [
-        const PremiumHeader(title: 'Controle de Presença', subtitle: 'Auditoria ISO 9001 de geofencing e jornada de trabalho.'),
+        const PremiumHeader(title: 'Controle de Presença', subtitle: 'Auditoria de geofencing e controle de diárias.'),
         const SizedBox(height: 30),
         Expanded(
-          child: presences.isEmpty 
-          ? const Center(child: Text('Nenhum registro de presença para hoje.', style: TextStyle(color: AppColors.textSecondary)))
-          : ListView.builder(
-              itemCount: presences.length,
-              itemBuilder: (context, i) {
-                final p = presences[i];
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 15),
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: AppColors.cardDark, 
-                    borderRadius: BorderRadius.circular(15),
-                    border: Border.all(color: Colors.white.withOpacity(0.05))
-                  ),
-                  child: Row(
-                    children: [
-                      const CircleAvatar(radius: 22, backgroundColor: AppColors.cardDark, child: Icon(Icons.person_outline, color: AppColors.neonCyan)),
-                      const SizedBox(width: 20),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(p.promoterName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
-                            const SizedBox(height: 5),
-                            Text('Loja: ${p.storeName} • Entrada: ${p.checkInTime} • Saída: ${p.checkOutTime}', style: const TextStyle(color: AppColors.textSecondary, fontSize: 11)),
-                          ],
+          child: _isLoading 
+          ? const Center(child: CircularProgressIndicator(color: AppColors.primaryBlue))
+          : _presences.isEmpty 
+            ? const Center(child: Text('Nenhum registro de presença para hoje.', style: TextStyle(color: AppColors.textSecondary)))
+            : ListView.builder(
+                itemCount: _presences.length,
+                itemBuilder: (context, i) {
+                  final p = _presences[i];
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 15),
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.white, 
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.cardBorder),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))
+                      ]
+                    ),
+                    child: Row(
+                      children: [
+                        const CircleAvatar(radius: 24, backgroundColor: AppColors.background, child: Icon(Icons.person_outline, color: AppColors.primaryBlue)),
+                        const SizedBox(width: 20),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(p.promoterName, style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w800, fontSize: 16)),
+                              const SizedBox(height: 6),
+                              Text('Local: ${p.storeName} • Entrada: ${p.checkInTime} • Saída: ${p.checkOutTime}', style: const TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w500)),
+                            ],
+                          ),
                         ),
-                      ),
-                      _buildAuditTag('GPS: ${p.gpsValid ? "OK" : "NOK"}', p.gpsValid ? AppColors.successEmerald : Colors.redAccent),
-                      const SizedBox(width: 10),
-                      _buildAuditTag('FOTO: ${p.photoValid ? "OK" : "NOK"}', p.photoValid ? AppColors.successEmerald : Colors.redAccent),
-                      const SizedBox(width: 10),
-                      _buildAuditTag(p.status, AppColors.neonCyan),
-                    ],
-                  ),
-                );
-              },
-            ),
+                        _buildAuditTag('GPS: ${p.gpsValid ? "OK" : "NOK"}', p.gpsValid ? AppColors.success : AppColors.error),
+                        const SizedBox(width: 12),
+                        _buildAuditTag('FOTO: ${p.photoValid ? "OK" : "NOK"}', p.photoValid ? AppColors.success : AppColors.error),
+                        const SizedBox(width: 12),
+                        _buildAuditTag(p.status, AppColors.primaryBlue),
+                      ],
+                    ),
+                  );
+                },
+              ),
         ),
       ]
     );
@@ -67,9 +107,9 @@ class _PresenceControlViewState extends State<PresenceControlView> {
 
   Widget _buildAuditTag(String label, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(5)),
-      child: Text(label, style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 1)),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
+      child: Text(label, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
     );
   }
 }

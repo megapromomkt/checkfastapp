@@ -1,5 +1,15 @@
 {
   "projects": {
     "default": "checkfast-28a72"
-  }
+  },
+  "targets": {
+    "checkfast-28a72": {
+      "hosting": {
+        "production": [
+          "checkfast-28a72"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }

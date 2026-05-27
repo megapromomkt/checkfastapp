@@ -41,7 +41,7 @@ class MobilePremiumHomeView extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(color: AppColors.cardDark, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.glassBorderDark)),
-                    child: const Icon(Icons.notifications_none, color: AppColors.textWhite, size: 20),
+                    child: const Icon(Icons.notifications_none, color: Colors.white, size: 20),
                   ),
                 ],
               ),
@@ -85,7 +85,7 @@ class MobilePremiumHomeView extends StatelessWidget {
                             ],
                           ),
                         ),
-                        const Text('R\$ 150', style: TextStyle(color: AppColors.successEmerald, fontWeight: FontWeight.bold, fontSize: 18)),
+                        const Text('R\$ 150', style: TextStyle(color: AppColors.success, fontWeight: FontWeight.bold, fontSize: 18)),
                       ],
                     ),
                     const SizedBox(height: 20),

@@ -1,6 +1,8 @@
 import 'package:safe_device/safe_device.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:io' show Platform;
+import 'package:crypto/crypto.dart';
+import 'dart:convert';
 
 class SecurityService {
   /// Retorna as violações de segurança do aparelho. 
@@ -32,5 +34,24 @@ class SecurityService {
     }
 
     return violations;
+  }
+
+  /// Gera um hash SHA-256 de uma senha.
+  static String hashPassword(String password) {
+    final bytes = utf8.encode(password);
+    final digest = sha256.convert(bytes);
+    return digest.toString();
+  }
+
+  /// Verifica se a senha informada corresponde à cadastrada, suportando legado.
+  static bool verifyPassword(String inputPassword, String storedPassword) {
+    if (storedPassword.length == 64) {
+      // Já está em hash SHA-256
+      final hashedInput = hashPassword(inputPassword);
+      return hashedInput == storedPassword;
+    } else {
+      // Legado em texto simples
+      return inputPassword == storedPassword;
+    }
   }
 }

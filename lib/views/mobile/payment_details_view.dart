@@ -18,13 +18,13 @@ class PaymentDetailsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.spaceBlack,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: Colors.transparent, 
         elevation: 0, 
         leading: IconButton(
           onPressed: () => Navigator.pop(context), 
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18)
+          icon: const Icon(Icons.arrow_back_ios_new, color: AppColors.textPrimary, size: 18)
         )
       ), 
       body: SingleChildScrollView(
@@ -45,9 +45,9 @@ class PaymentDetailsView extends StatelessWidget {
                   _buildFinanceRow('Horário Check-in', '08:02'),
                   _buildFinanceRow('Horário Checkout', '14:14'),
                   _buildFinanceRow('Tempo em Loja', '06h 12m'),
-                  const Divider(color: Colors.white10, height: 35),
+                  const Divider(color: AppColors.cardBorder, height: 35),
                   _buildFinanceRow('Valor da Diária', 'R\$ 150,00'),
-                  _buildFinanceRow('Valor Líquido Aprovado', value, valueColor: AppColors.successEmerald),
+                  _buildFinanceRow('Valor Líquido Aprovado', value, valueColor: AppColors.success),
                   _buildFinanceRow('Status Financeiro', status, valueColor: _getStatusColor(status)),
                 ],
               ),
@@ -58,21 +58,21 @@ class PaymentDetailsView extends StatelessWidget {
             // Alerta de Irregularidade (Se houver)
             if (status == 'Não Apto' || status == 'Reprovado')
               PremiumCard(
-                borderColor: Colors.redAccent.withOpacity(0.5),
+                borderColor: AppColors.error.withOpacity(0.5),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Row(
+                    Row(
                       children: [
-                        Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 18),
-                        SizedBox(width: 10),
-                        Text('MOTIVO DA REPROVAÇÃO', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 11)),
+                        const Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 18),
+                        const SizedBox(width: 10),
+                        Text('MOTIVO DA REPROVAÇÃO', style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold, fontSize: 11)),
                       ],
                     ),
                     const SizedBox(height: 12),
                     const Text(
                       'A jornada mínima de 4 horas obrigatória por contrato não foi identificada no sistema de auditoria do CheckFast.',
-                      style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.5)
+                      style: TextStyle(color: AppColors.textSecondary, fontSize: 12, height: 1.5)
                     ),
                   ],
                 ),
@@ -84,8 +84,8 @@ class PaymentDetailsView extends StatelessWidget {
             Center(
               child: TextButton.icon(
                 onPressed: () {}, 
-                icon: const Icon(Icons.help_outline, color: AppColors.neonCyan, size: 18), 
-                label: const Text('Contestar este recebimento', style: TextStyle(color: AppColors.neonCyan, fontWeight: FontWeight.bold, fontSize: 13))
+                icon: const Icon(Icons.help_outline, color: AppColors.primaryBlue, size: 18), 
+                label: const Text('Contestar este recebimento', style: TextStyle(color: AppColors.primaryBlue, fontWeight: FontWeight.bold, fontSize: 13))
               ),
             ),
             const SizedBox(height: 50),
@@ -102,7 +102,7 @@ class PaymentDetailsView extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-          Text(value, style: TextStyle(color: valueColor ?? Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+          Text(value, style: TextStyle(color: valueColor ?? AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 14)),
         ],
       ),
     );
@@ -110,10 +110,10 @@ class PaymentDetailsView extends StatelessWidget {
 
   Color _getStatusColor(String status) {
     switch (status) {
-      case 'Pago': return AppColors.successEmerald;
-      case 'Aprovado': return AppColors.electricBlue;
-      case 'Em análise': return AppColors.alertOrange;
-      default: return Colors.redAccent;
+      case 'Pago': return AppColors.success;
+      case 'Aprovado': return AppColors.primaryBlue;
+      case 'Em análise': return AppColors.warning;
+      default: return AppColors.error;
     }
   }
 }

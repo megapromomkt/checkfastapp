@@ -142,8 +142,8 @@ class _DemandCreationViewState extends State<DemandCreationView> {
                                 onPressed: () {},
                                 icon: const Icon(Icons.calendar_month, color: AppColors.primaryBlue),
                                 label: Text(
-                                  'Data: \${_selectedDate.day.toString().padLeft(2,'0')}/\${_selectedDate.month.toString().padLeft(2,'0')}/\${_selectedDate.year}', 
-                                  style: const TextStyle(color: AppColors.primaryBlue)
+                                  'Data: ${_selectedDate.day.toString().padLeft(2, '0')}/${_selectedDate.month.toString().padLeft(2, '0')}/${_selectedDate.year}', 
+                                  style: const TextStyle(color: AppColors.primaryBlue),
                                 ),
                                 style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15)),
                               )

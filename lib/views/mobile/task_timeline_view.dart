@@ -17,15 +17,15 @@ class TaskTimelineView extends StatelessWidget {
     bool isApto = status == 'Concluída';
 
     return Scaffold(
-      backgroundColor: AppColors.spaceBlack,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: Colors.transparent, 
         elevation: 0, 
         leading: IconButton(
           onPressed: () => Navigator.pop(context), 
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18)
+          icon: const Icon(Icons.arrow_back_ios_new, color: AppColors.textPrimary, size: 18)
         ),
-        title: const Text('Cronologia do Dia', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        title: const Text('Cronologia do Dia', style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w800)),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(25.0),
@@ -34,11 +34,11 @@ class TaskTimelineView extends StatelessWidget {
           children: [
             // Cabeçalho da Cronologia
             _buildTimelineHeader(),
-            const SizedBox(height: 35),
+            const SizedBox(height: 40),
 
             // Linha do Tempo
-            const Text('LINHA DO TEMPO DA EXECUÇÃO', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 2)),
-            const SizedBox(height: 25),
+            const Text('LINHA DO TEMPO DA EXECUÇÃO', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1.5)),
+            const SizedBox(height: 32),
             
             _buildTimelineStep(
               step: 1,
@@ -66,7 +66,7 @@ class TaskTimelineView extends StatelessWidget {
               isLast: true,
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 40),
 
             // Card de Status de Pagamento
             _buildPaymentStatusCard(isApto),
@@ -83,14 +83,18 @@ class TaskTimelineView extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(storeName, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
-          const Text('Projeto: Reposição Verão | Promotor', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-          const Divider(color: Colors.white10, height: 30),
+          Text(storeName, style: const TextStyle(color: AppColors.textPrimary, fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
+          const SizedBox(height: 4),
+          const Text('Projeto: Reposição Verão | Promotor', style: TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w500)),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Divider(color: AppColors.cardBorder, height: 1),
+          ),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               _buildHeaderInfo('DATA', '27/04/2026'),
-              _buildHeaderInfo('VALOR DIÁRIA', 'R\$ 150,00', valueColor: AppColors.successEmerald),
+              _buildHeaderInfo('VALOR DIÁRIA', 'R\$ 150,00', valueColor: AppColors.success),
               _buildHeaderInfo('MÍN. HORAS', '04:00'),
             ],
           )
@@ -103,9 +107,9 @@ class TaskTimelineView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 9, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 4),
-        Text(value, style: TextStyle(color: valueColor ?? Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+        Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+        const SizedBox(height: 6),
+        Text(value, style: TextStyle(color: valueColor ?? AppColors.textPrimary, fontSize: 15, fontWeight: FontWeight.w800)),
       ],
     );
   }
@@ -126,15 +130,16 @@ class TaskTimelineView extends StatelessWidget {
         Column(
           children: [
             Container(
-              width: 24, 
-              height: 24, 
+              width: 28, 
+              height: 28, 
               decoration: BoxDecoration(
-                color: isValid ? AppColors.neonCyan : Colors.white10, 
-                shape: BoxShape.circle
+                color: isValid ? AppColors.primaryBlue : AppColors.background, 
+                shape: BoxShape.circle,
+                border: Border.all(color: isValid ? AppColors.primaryBlue : AppColors.cardBorder, width: 2)
               ),
-              child: Center(child: Text(step.toString(), style: const TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.bold))),
+              child: Center(child: Text(step.toString(), style: TextStyle(color: isValid ? Colors.white : AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w900))),
             ),
-            if (!isLast) Container(width: 2, height: 80, color: Colors.white10),
+            if (!isLast) Container(width: 2, height: 100, color: AppColors.cardBorder),
           ],
         ),
         const SizedBox(width: 20),
@@ -146,25 +151,25 @@ class TaskTimelineView extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 1)),
-                  Text(time, style: const TextStyle(color: AppColors.neonCyan, fontWeight: FontWeight.bold, fontSize: 14)),
+                  Text(title, style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 1)),
+                  Text(time, style: const TextStyle(color: AppColors.primaryBlue, fontWeight: FontWeight.w900, fontSize: 15)),
                 ],
               ),
-              const SizedBox(height: 4),
-              Text(desc, style: const TextStyle(color: AppColors.textSecondary, fontSize: 11)),
-              const SizedBox(height: 12),
+              const SizedBox(height: 6),
+              Text(desc, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w500)),
+              const SizedBox(height: 16),
               if (!isDuration) 
                 Container(
-                  width: 60, 
-                  height: 60, 
+                  width: 64, 
+                  height: 64, 
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.03), 
-                    borderRadius: BorderRadius.circular(8), 
-                    border: Border.all(color: Colors.white10)
+                    color: AppColors.background, 
+                    borderRadius: BorderRadius.circular(12), 
+                    border: Border.all(color: AppColors.cardBorder)
                   ),
-                  child: const Icon(Icons.camera_alt_outlined, color: Colors.white24, size: 20),
+                  child: Icon(Icons.camera_alt_outlined, color: AppColors.textSecondary.withOpacity(0.3), size: 24),
                 ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
             ],
           ),
         ),
@@ -173,23 +178,23 @@ class TaskTimelineView extends StatelessWidget {
   }
 
   Widget _buildPaymentStatusCard(bool isApto) {
-    Color cardColor = isApto ? AppColors.successEmerald : Colors.redAccent;
+    Color statusColor = isApto ? AppColors.success : AppColors.error;
     return PremiumCard(
-      borderColor: cardColor.withOpacity(0.5),
+      borderColor: statusColor.withOpacity(0.3),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(isApto ? Icons.check_circle : Icons.error_outline, color: cardColor, size: 22),
-              const SizedBox(width: 15),
+              Icon(isApto ? Icons.check_circle_rounded : Icons.error_rounded, color: statusColor, size: 24),
+              const SizedBox(width: 16),
               Text(
                 isApto ? 'APTO PARA PAGAMENTO' : 'NÃO APTO PARA PAGAMENTO', 
-                style: TextStyle(color: cardColor, fontWeight: FontWeight.w900, fontSize: 14)
+                style: TextStyle(color: statusColor, fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 0.5)
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
           if (isApto) ...[
             _buildRequirement('04 Horas cumpridas', true),
             _buildRequirement('Check-in realizado', true),
@@ -197,8 +202,8 @@ class TaskTimelineView extends StatelessWidget {
             _buildRequirement('Fotos enviadas', true),
             _buildRequirement('Localização validada', true),
           ] else ...[
-            const Text('Motivo: Presença em Análise / Irregularidade detectada', style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
-            const SizedBox(height: 12),
+            const Text('Motivo: Presença em Análise / Irregularidade detectada', style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 16),
             _buildRequirement('Menos de 4 horas em loja', false),
             _buildRequirement('Checkout não realizado', false),
             _buildRequirement('Localização inválida', false),
@@ -210,12 +215,19 @@ class TaskTimelineView extends StatelessWidget {
 
   Widget _buildRequirement(String text, bool met) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         children: [
-          Icon(met ? Icons.check : Icons.close, color: met ? AppColors.successEmerald : Colors.redAccent, size: 14),
-          const SizedBox(width: 10),
-          Text(text, style: TextStyle(color: met ? Colors.white70 : Colors.redAccent.withOpacity(0.7), fontSize: 11)),
+          Container(
+            padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(
+              color: (met ? AppColors.success : AppColors.error).withOpacity(0.1),
+              shape: BoxShape.circle
+            ),
+            child: Icon(met ? Icons.check_rounded : Icons.close_rounded, color: met ? AppColors.success : AppColors.error, size: 12),
+          ),
+          const SizedBox(width: 12),
+          Text(text, style: TextStyle(color: met ? AppColors.textPrimary : AppColors.error.withOpacity(0.8), fontSize: 12, fontWeight: FontWeight.w600)),
         ],
       ),
     );

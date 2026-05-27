@@ -16,13 +16,13 @@ class _PixKeyViewState extends State<PixKeyView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.spaceBlack,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: const Text('Chave PIX', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: const Text('Configurar Chave PIX', style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w800)),
         leading: IconButton(
-          icon: const Icon(IconsaxPlusLinear.arrow_left, color: Colors.white),
+          icon: const Icon(IconsaxPlusLinear.arrow_left, color: AppColors.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -31,67 +31,69 @@ class _PixKeyViewState extends State<PixKeyView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Seus pagamentos serão enviados para esta chave.', style: TextStyle(color: AppColors.textSecondary)),
-            const SizedBox(height: 30),
+            const Text('Seus pagamentos serão enviados para esta chave com segurança.', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
+            const SizedBox(height: 40),
             
-            const Text('TIPO DE CHAVE', style: TextStyle(color: AppColors.textSecondary, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
-            const SizedBox(height: 10),
+            const Text('TIPO DE CHAVE', style: TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1)),
+            const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               decoration: BoxDecoration(
-                color: AppColors.cardDark,
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.glassBorderDark),
+                border: Border.all(color: AppColors.cardBorder),
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
                   value: _selectedType,
-                  dropdownColor: AppColors.cardDark,
+                  dropdownColor: Colors.white,
                   isExpanded: true,
-                  icon: const Icon(IconsaxPlusLinear.arrow_down_1, color: AppColors.neonCyan),
-                  style: const TextStyle(color: Colors.white, fontSize: 16),
+                  icon: const Icon(IconsaxPlusLinear.arrow_down_1, color: AppColors.primaryBlue),
+                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600),
                   onChanged: (val) => setState(() => _selectedType = val!),
                   items: ['CPF', 'E-mail', 'Celular', 'Chave Aleatória'].map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
                 ),
               ),
             ),
             
-            const SizedBox(height: 25),
-            const Text('VALOR DA CHAVE', style: TextStyle(color: AppColors.textSecondary, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
-            const SizedBox(height: 10),
+            const SizedBox(height: 24),
+            const Text('VALOR DA CHAVE', style: TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1)),
+            const SizedBox(height: 12),
             Container(
               decoration: BoxDecoration(
-                color: AppColors.cardDark,
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.glassBorderDark),
+                border: Border.all(color: AppColors.cardBorder),
               ),
               child: TextField(
                 controller: _keyController,
-                style: const TextStyle(color: Colors.white),
+                style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w700),
                 decoration: const InputDecoration(
-                  prefixIcon: Icon(IconsaxPlusLinear.card_receive, color: AppColors.neonCyan, size: 20),
+                  prefixIcon: Icon(IconsaxPlusLinear.card_receive, color: AppColors.primaryBlue, size: 20),
                   border: InputBorder.none,
                   contentPadding: EdgeInsets.all(18),
                   hintText: 'Digite sua chave pix...',
-                  hintStyle: TextStyle(color: Colors.white24),
+                  hintStyle: TextStyle(color: AppColors.textSecondary),
                 ),
               ),
             ),
             
-            const SizedBox(height: 40),
+            const SizedBox(height: 48),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Chave PIX atualizada!')));
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Chave PIX atualizada com sucesso!'), backgroundColor: AppColors.success));
                   Navigator.pop(context);
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.successEmerald,
-                  padding: const EdgeInsets.all(20),
+                  backgroundColor: AppColors.primaryBlue,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.all(22),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text('CADASTRAR CHAVE PIX', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                child: const Text('SALVAR ALTERAÇÕES', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.5)),
               ),
             ),
           ],

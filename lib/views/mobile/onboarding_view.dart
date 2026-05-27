@@ -232,11 +232,11 @@ class _OnboardingViewState extends State<OnboardingView> {
     decoration: BoxDecoration(color: Colors.white.withOpacity(0.03), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white10)),
     child: Row(
       children: [
-        Icon(d ? Icons.check_circle : Icons.camera_alt, color: d ? AppColors.successEmerald : AppColors.neonCyan, size: 20),
+        Icon(d ? Icons.check_circle : Icons.camera_alt, color: d ? AppColors.success : AppColors.neonCyan, size: 20),
         const SizedBox(width: 15),
         Text(l, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
         const Spacer(),
-        if (d) const Icon(Icons.verified, color: AppColors.successEmerald, size: 16),
+        if (d) const Icon(Icons.verified, color: AppColors.success, size: 16),
       ],
     ),
   );

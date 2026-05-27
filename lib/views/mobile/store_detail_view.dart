@@ -1,26 +1,25 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/premium_theme.dart';
+import '../../models/app_models.dart';
 
 class StoreDetailView extends StatelessWidget {
-  final String storeName;
-  final String network;
+  final AppDemand? demand;
   
   const StoreDetailView({
     super.key, 
-    required this.storeName,
-    required this.network,
+    this.demand,
   });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.spaceBlack,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: Colors.transparent, 
         elevation: 0, 
         leading: IconButton(
           onPressed: () => Navigator.pop(context), 
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18)
+          icon: const Icon(Icons.arrow_back_ios_new, color: AppColors.textPrimary, size: 18)
         )
       ), 
       body: SingleChildScrollView(
@@ -28,18 +27,21 @@ class StoreDetailView extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            PremiumHeader(title: storeName, subtitle: network),
-            const SizedBox(height: 30),
+            PremiumHeader(
+              title: demand?.storeName ?? 'Detalhes da Loja', 
+              subtitle: demand?.network ?? 'Rede não informada'
+            ),
+            const SizedBox(height: 35),
 
             // 1. INFORMAÇÕES DA LOJA
             _buildSectionTitle('INFORMAÇÕES DA LOJA'),
             PremiumCard(
               child: Column(
                 children: [
-                  _buildDetailRow(Icons.location_on_outlined, 'Endereço Completo', 'Rua Gago Coutinho, 350 - Lapa, São Paulo - SP'),
-                  _buildDetailRow(Icons.map_outlined, 'Ponto de Referência', 'Próximo à Estação Lapa da CPTM'),
-                  _buildDetailRow(Icons.person_outline, 'Responsável / Gerente', 'Sr. Marcos Oliveira'),
-                  _buildDetailRow(Icons.phone_outlined, 'Telefone de Contato', '(11) 3641-0000'),
+                  _buildDetailRow(Icons.location_on_outlined, 'Endereço Completo', demand?.address ?? 'Endereço não informado'),
+                  _buildDetailRow(Icons.map_outlined, 'Ponto de Referência', 'Verificar no mapa'),
+                  _buildDetailRow(Icons.person_outline, 'Responsável / Gerente', 'Solicitar na chegada'),
+                  _buildDetailRow(Icons.phone_outlined, 'Telefone de Contato', 'Não disponível'),
                 ],
               ),
             ),
@@ -50,14 +52,20 @@ class StoreDetailView extends StatelessWidget {
             PremiumCard(
               child: Column(
                 children: [
-                  _buildDetailRow(Icons.work_outline, 'Função', 'Promotor de Vendas Especialista'),
-                  _buildDetailRow(Icons.list_alt_outlined, 'Atividade Obrigatória', 'Reposição, limpeza de gôndola e aplicação de materiais de merchandising.'),
-                  _buildDetailRow(Icons.ads_click, 'Passo a Passo', '1. Check-in\n2. Foto da gôndola antes\n3. Reposição\n4. Foto da gôndola depois\n5. Checkout'),
-                  _buildDetailRow(Icons.access_time, 'Horário', 'Entrada: 08:00 | Saída: 14:00'),
-                  _buildDetailRow(Icons.timer_outlined, 'Tempo Mínimo', '04 Horas para validação de pagamento'),
-                  _buildDetailRow(Icons.payments_outlined, 'Valor da Diária', 'R\$ 150,00', valueColor: AppColors.successEmerald),
-                  _buildDetailRow(Icons.checkroom, 'Vestimenta', 'Calça jeans escura, tênis preto e camiseta branca lisa.'),
-                  _buildDetailRow(Icons.badge_outlined, 'Documentos', 'RG e CPF original com foto.'),
+                  _buildDetailRow(Icons.work_outline, 'Função', demand?.role ?? 'Promotor'),
+                  if (demand != null)
+                    _buildDetailRow(
+                      Icons.calendar_today_outlined, 
+                      demand!.date.contains(' - ') ? 'Período da Ação' : 'Data', 
+                      demand!.date
+                    ),
+                  _buildDetailRow(Icons.list_alt_outlined, 'Atividade Obrigatória', demand?.requiredActivity ?? 'Reposição e limpeza.'),
+                  _buildDetailRow(Icons.ads_click, 'Passo a Passo', demand?.stepByStep ?? '1. Check-in\n2. Execução\n3. Check-out'),
+                  _buildDetailRow(Icons.access_time, 'Horário', demand?.timeRange ?? '08:00 - 14:00'),
+                  _buildDetailRow(Icons.timer_outlined, 'Tempo Mínimo', demand?.minTime ?? '04 Horas'),
+                  _buildDetailRow(Icons.payments_outlined, 'Valor da Diária', 'R\$ ${demand?.value.toStringAsFixed(2) ?? '150,00'}', valueColor: AppColors.success),
+                  _buildDetailRow(Icons.checkroom, 'Vestimenta', demand?.dressCode ?? 'Camiseta branca e calça jeans.'),
+                  _buildDetailRow(Icons.badge_outlined, 'Documentos', demand?.requiredDocuments ?? 'RG e CPF.'),
                 ],
               ),
             ),
@@ -66,29 +74,78 @@ class StoreDetailView extends StatelessWidget {
             // 3. REGRAS DE COMPROVAÇÃO
             _buildSectionTitle('REGRAS DE COMPROVAÇÃO'),
             PremiumCard(
-              borderColor: AppColors.alertOrange.withOpacity(0.3),
+              borderColor: AppColors.warning.withOpacity(0.3),
               child: Column(
                 children: [
-                  _buildDetailRow(Icons.gps_fixed, 'Localização', 'Check-in e Checkout obrigatórios via GPS'),
-                  _buildDetailRow(Icons.camera_alt_outlined, 'Fotos de Auditoria', 'Foto obrigatória no início e final da jornada'),
-                  _buildDetailRow(Icons.radar, 'Raio de Validação', 'Até 200 metros da coordenada da loja'),
+                  _buildDetailRow(Icons.gps_fixed, 'Localização', demand?.requiresLocation == true ? 'Check-in e Checkout obrigatórios via GPS' : 'Localização não exigida'),
+                  _buildDetailRow(Icons.camera_alt_outlined, 'Fotos de Auditoria', demand?.requiresPhoto == true ? 'Foto obrigatória no início e final' : 'Fotos não exigidas'),
+                  _buildDetailRow(Icons.radar, 'Raio de Validação', 'Até ${demand?.allowedRadius ?? 100} metros da coordenada da loja'),
                 ],
               ),
             ),
 
             const SizedBox(height: 40),
             
+            // Aviso de Período
+            if (demand != null && demand!.date.contains(' - ')) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.warning.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.warning.withOpacity(0.3)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.warning_amber_rounded, color: AppColors.warning, size: 20),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'ATENÇÃO AO PERÍODO',
+                            style: TextStyle(
+                              color: AppColors.warning, 
+                              fontWeight: FontWeight.bold, 
+                              fontSize: 12,
+                              letterSpacing: 0.5
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Ao aceitar esta demanda, você estará escalado para todos os ${_calculateDays(demand!.date)} dias de ação deste período (${demand!.date}). Certifique-se de que possui disponibilidade para todos os dias.',
+                            style: const TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+
             // Botão Principal
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () => Navigator.pop(context, true), 
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.neonCyan,
-                  padding: const EdgeInsets.all(20),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))
+                  backgroundColor: AppColors.primaryBlue,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.all(22),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
                 ),
-                child: const Text('ACEITAR LOJA E TAREFA', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 16))
+                child: const Text('ACEITAR LOJA E TAREFA', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 0.5))
               ),
             ),
             const SizedBox(height: 50),
@@ -98,10 +155,36 @@ class StoreDetailView extends StatelessWidget {
     );
   }
 
+  int _calculateDays(String dateStr) {
+    if (!dateStr.contains(' - ')) return 1;
+    final parts = dateStr.split(' - ');
+    if (parts.length != 2) return 1;
+    try {
+      final startParts = parts[0].trim().split('/');
+      final endParts = parts[1].trim().split('/');
+      if (startParts.length != 3 || endParts.length != 3) return 1;
+      
+      final startDate = DateTime(
+        int.parse(startParts[2]),
+        int.parse(startParts[1]),
+        int.parse(startParts[0]),
+      );
+      final endDate = DateTime(
+        int.parse(endParts[2]),
+        int.parse(endParts[1]),
+        int.parse(endParts[0]),
+      );
+      
+      return endDate.difference(startDate).inDays + 1;
+    } catch (_) {
+      return 3; // Fallback para 3 dias de ação
+    }
+  }
+
   Widget _buildSectionTitle(String title) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12, left: 5),
-      child: Text(title, style: const TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
+      child: Text(title, style: const TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.5)),
     );
   }
 
@@ -111,15 +194,15 @@ class StoreDetailView extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: AppColors.neonCyan, size: 18),
-          const SizedBox(width: 15),
+          Icon(icon, color: AppColors.primaryBlue, size: 18),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 10, fontWeight: FontWeight.bold)),
+                Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
                 const SizedBox(height: 4),
-                Text(value, style: TextStyle(color: valueColor ?? Colors.white, fontSize: 14, height: 1.4)),
+                Text(value, style: TextStyle(color: valueColor ?? AppColors.textPrimary, fontSize: 14, height: 1.4, fontWeight: FontWeight.w600)),
               ],
             ),
           ),

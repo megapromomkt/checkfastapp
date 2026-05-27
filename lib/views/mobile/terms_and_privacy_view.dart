@@ -59,7 +59,7 @@ class TermsAndPrivacyView extends StatelessWidget {
       padding: const EdgeInsets.only(top: 8.0),
       child: Text(
         text,
-        style: const TextStyle(color: AppColors.textWhite, fontSize: 14, height: 1.5),
+        style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.5),
       ),
     );
   }

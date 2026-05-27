@@ -33,64 +33,91 @@ class RegistersListDetailLayout<T> extends StatelessWidget {
       children: [
         // LADO ESQUERDO: LISTA
         Container(
-          width: 350,
+          width: 380,
           decoration: BoxDecoration(
-            color: AppColors.cardDark,
-            borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: AppColors.glassBorderDark),
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.cardBorder),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF1E293B).withOpacity(0.04),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              )
+            ],
           ),
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(24),
                 child: Row(
                   children: [
                     Expanded(
                       child: TextField(
-                        style: const TextStyle(color: Colors.white, fontSize: 13),
+                        style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
                         decoration: InputDecoration(
                           hintText: searchHint,
                           hintStyle: const TextStyle(color: AppColors.textSecondary),
-                          prefixIcon: const Icon(IconsaxPlusLinear.search_normal, size: 18, color: AppColors.textSecondary),
-                          fillColor: Colors.white.withOpacity(0.05),
+                          prefixIcon: const Icon(IconsaxPlusLinear.search_normal, size: 20, color: AppColors.textSecondary),
+                          fillColor: AppColors.background,
                           filled: true,
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-                          contentPadding: EdgeInsets.zero,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                          contentPadding: const EdgeInsets.symmetric(vertical: 12),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 15),
-                    IconButton(
-                      onPressed: onAdd,
-                      icon: const Icon(IconsaxPlusLinear.add_square, color: AppColors.neonCyan),
-                      style: IconButton.styleFrom(backgroundColor: AppColors.neonCyan.withOpacity(0.1)),
+                    const SizedBox(width: 12),
+                    Material(
+                      color: AppColors.primaryBlue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      child: InkWell(
+                        onTap: onAdd,
+                        borderRadius: BorderRadius.circular(8),
+                        child: const Padding(
+                          padding: EdgeInsets.all(10),
+                          child: Icon(IconsaxPlusLinear.add, color: AppColors.primaryBlue, size: 24),
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
-              const Divider(color: Colors.white10, height: 1),
+              const Divider(color: AppColors.cardBorder, height: 1),
               Expanded(
                 child: ListView.separated(
                   itemCount: items.length,
-                  separatorBuilder: (context, index) => const Divider(color: Colors.white10, height: 1),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  separatorBuilder: (context, index) => const Divider(color: AppColors.cardBorder, height: 1, indent: 24, endIndent: 24),
                   itemBuilder: (context, index) {
                     final item = items[index];
                     final isSelected = selectedItem == item;
-                    return ListTile(
-                      onTap: () => onSelect(item),
-                      selected: isSelected,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                      title: Text(itemTitle(item), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-                      subtitle: itemSubtitle != null ? Text(itemSubtitle!(item), style: const TextStyle(color: AppColors.textSecondary, fontSize: 11)) : null,
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            onPressed: () => onDelete(item),
-                            icon: const Icon(IconsaxPlusLinear.trash, size: 16, color: Colors.redAccent),
-                          ),
-                          const Icon(Icons.chevron_right, color: AppColors.textSecondary, size: 16),
-                        ],
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: ListTile(
+                        onTap: () => onSelect(item),
+                        selected: isSelected,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        selectedTileColor: AppColors.primaryBlue.withOpacity(0.06),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        title: Text(itemTitle(item), style: TextStyle(
+                          color: isSelected ? AppColors.primaryBlue : AppColors.textPrimary, 
+                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600, 
+                          fontSize: 14
+                        )),
+                        subtitle: itemSubtitle != null ? Text(itemSubtitle!(item), style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)) : null,
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              onPressed: () => onDelete(item),
+                              icon: const Icon(IconsaxPlusLinear.trash, size: 18, color: AppColors.error),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                            const SizedBox(width: 8),
+                            Icon(Icons.chevron_right, color: isSelected ? AppColors.primaryBlue : AppColors.textSecondary, size: 18),
+                          ],
+                        ),
                       ),
                     );
                   },
@@ -99,7 +126,7 @@ class RegistersListDetailLayout<T> extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(width: 30),
+        const SizedBox(width: 32),
         // LADO DIREITO: DETALHE
         Expanded(
           child: selectedItem == null
@@ -107,9 +134,10 @@ class RegistersListDetailLayout<T> extends StatelessWidget {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(IconsaxPlusLinear.document_text, size: 64, color: Colors.white.withOpacity(0.1)),
-                      const SizedBox(height: 20),
-                      const Text('Selecione ou crie um item para ver os detalhes.', style: TextStyle(color: AppColors.textSecondary)),
+                      Icon(IconsaxPlusLinear.document_text, size: 80, color: AppColors.textSecondary.withOpacity(0.1)),
+                      const SizedBox(height: 24),
+                      const Text('Selecione um item da lista para visualizar os detalhes', 
+                        style: TextStyle(color: AppColors.textSecondary, fontSize: 16, fontWeight: FontWeight.w500)),
                     ],
                   ),
                 )

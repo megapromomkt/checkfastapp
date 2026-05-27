@@ -335,11 +335,11 @@ class _ClientsManagementViewState extends State<ClientsManagementView> {
   Widget _buildStatusBadge(String s) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), 
     decoration: BoxDecoration(
-      color: s == 'ATIVO' ? AppColors.successEmerald.withOpacity(0.1) : Colors.orange.withOpacity(0.1), 
+      color: s == 'ATIVO' ? AppColors.success.withOpacity(0.1) : Colors.orange.withOpacity(0.1), 
       borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: s == 'ATIVO' ? AppColors.successEmerald.withOpacity(0.3) : Colors.orange.withOpacity(0.3))
+      border: Border.all(color: s == 'ATIVO' ? AppColors.success.withOpacity(0.3) : Colors.orange.withOpacity(0.3))
     ), 
-    child: Text(s, style: TextStyle(color: s == 'ATIVO' ? AppColors.successEmerald : Colors.orange, fontSize: 9, fontWeight: FontWeight.bold))
+    child: Text(s, style: TextStyle(color: s == 'ATIVO' ? AppColors.success : Colors.orange, fontSize: 9, fontWeight: FontWeight.bold))
   );
 
   Widget _buildSmallFilter(String l) => Padding(

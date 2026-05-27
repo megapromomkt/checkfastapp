@@ -35,7 +35,7 @@ class ForgotPasswordView extends StatelessWidget {
               child: ElevatedButton(
                 onPressed: () {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Link de recuperação enviado! Verifique seu e-mail.'), backgroundColor: AppColors.successEmerald),
+                    const SnackBar(content: Text('Link de recuperação enviado! Verifique seu e-mail.'), backgroundColor: AppColors.success),
                   );
                 },
                 style: ElevatedButton.styleFrom(backgroundColor: AppColors.electricBlue, padding: const EdgeInsets.symmetric(vertical: 18)),
