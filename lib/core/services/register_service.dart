@@ -12,7 +12,7 @@ class RegisterService {
   }
 
   Future<void> saveClient(AppClient client) async {
-    await FirebaseFirestore.instance.collection('clients').doc(client.id).set(client.toMap());
+    await FirebaseFirestore.instance.collection('clients').doc(client.id).set(client.toMap(), SetOptions(merge: true));
   }
 
   Future<void> deleteClient(String id) async {
@@ -26,7 +26,7 @@ class RegisterService {
   }
 
   Future<void> saveProject(AppProject project) async {
-    await FirebaseFirestore.instance.collection('projects').doc(project.id).set(project.toMap());
+    await FirebaseFirestore.instance.collection('projects').doc(project.id).set(project.toMap(), SetOptions(merge: true));
   }
 
   Future<void> deleteProject(String id) async {
@@ -82,7 +82,7 @@ class RegisterService {
       }
     }
     
-    await FirebaseFirestore.instance.collection('stores').doc(store.id).set(store.toMap());
+    await FirebaseFirestore.instance.collection('stores').doc(store.id).set(store.toMap(), SetOptions(merge: true));
   }
 
   Future<void> deleteStore(String id) async {
@@ -96,7 +96,7 @@ class RegisterService {
   }
 
   Future<void> saveRole(AppRole role) async {
-    await FirebaseFirestore.instance.collection('roles').doc(role.id).set(role.toMap());
+    await FirebaseFirestore.instance.collection('roles').doc(role.id).set(role.toMap(), SetOptions(merge: true));
   }
 
   Future<void> deleteRole(String id) async {
@@ -110,7 +110,7 @@ class RegisterService {
   }
 
   Future<void> savePaymentRule(AppPaymentRule rule) async {
-    await FirebaseFirestore.instance.collection('payment_rules').doc(rule.id).set(rule.toMap());
+    await FirebaseFirestore.instance.collection('payment_rules').doc(rule.id).set(rule.toMap(), SetOptions(merge: true));
   }
 
   Future<void> deletePaymentRule(String id) async {
@@ -124,7 +124,7 @@ class RegisterService {
   }
 
   Future<void> saveDemandModel(AppDemandModel model) async {
-    await FirebaseFirestore.instance.collection('demand_models').doc(model.id).set(model.toMap());
+    await FirebaseFirestore.instance.collection('demand_models').doc(model.id).set(model.toMap(), SetOptions(merge: true));
   }
 
   Future<void> deleteDemandModel(String id) async {
@@ -138,7 +138,7 @@ class RegisterService {
   }
 
   Future<void> saveRede(AppRede rede) async {
-    await FirebaseFirestore.instance.collection('redes').doc(rede.id).set(rede.toMap());
+    await FirebaseFirestore.instance.collection('redes').doc(rede.id).set(rede.toMap(), SetOptions(merge: true));
   }
 
   Future<void> deleteRede(String id) async {
@@ -152,7 +152,7 @@ class RegisterService {
   }
 
   Future<void> saveBandeira(AppBandeira bandeira) async {
-    await FirebaseFirestore.instance.collection('bandeiras').doc(bandeira.id).set(bandeira.toMap());
+    await FirebaseFirestore.instance.collection('bandeiras').doc(bandeira.id).set(bandeira.toMap(), SetOptions(merge: true));
   }
 
   Future<void> deleteBandeira(String id) async {
@@ -185,7 +185,7 @@ class RegisterService {
 
 
   Future<void> saveDemand(AppDemand demand) async {
-    await FirebaseFirestore.instance.collection('demands').doc(demand.id).set(demand.toMap());
+    await FirebaseFirestore.instance.collection('demands').doc(demand.id).set(demand.toMap(), SetOptions(merge: true));
   }
 
   Future<void> deleteDemand(String id) async {
@@ -227,7 +227,7 @@ class RegisterService {
   }
 
   Future<void> saveEPIDelivery(AppEPIDelivery delivery) async {
-    await FirebaseFirestore.instance.collection('epi_deliveries').doc(delivery.id).set(delivery.toMap());
+    await FirebaseFirestore.instance.collection('epi_deliveries').doc(delivery.id).set(delivery.toMap(), SetOptions(merge: true));
   }
 
   Future<void> deleteEPIDelivery(String id) async {
@@ -241,7 +241,7 @@ class RegisterService {
   }
 
   Future<void> saveQuestionnaire(AppQuestionnaire questionnaire) async {
-    await FirebaseFirestore.instance.collection('questionnaires').doc(questionnaire.id).set(questionnaire.toMap());
+    await FirebaseFirestore.instance.collection('questionnaires').doc(questionnaire.id).set(questionnaire.toMap(), SetOptions(merge: true));
   }
 
   Future<void> deleteQuestionnaire(String id) async {

@@ -83,13 +83,14 @@ class _OnboardingDialogState extends State<_OnboardingDialog> {
 
   Future<void> _fetchCurriculum() async {
     try {
-      // Busca os dados do usuário usando o SDK do Firestore para evitar quota REST (429)
       final doc = await FirebaseFirestore.instance.collection('users').doc(widget.userCpf).get();
       if (doc.exists) {
-        final data = doc.data() as Map<String, dynamic>;
-        _promoterName = data['name']?.toString() ?? 'Promotor';
-        if (data.containsKey('curriculum_completo_dados')) {
-          final String cvJson = data['curriculum_completo_dados']?.toString() ?? '{}';
+        final docData = doc.data() as Map<String, dynamic>;
+        if (docData['name'] != null) {
+          _promoterName = docData['name']?.toString() ?? 'Promotor';
+        }
+        if (docData['curriculum_completo_dados'] != null) {
+          final String cvJson = docData['curriculum_completo_dados']?.toString() ?? '{}';
           setState(() {
             _curriculumData = jsonDecode(cvJson);
             _loadingCurriculum = false;
@@ -598,15 +599,12 @@ class _OnboardingDialogState extends State<_OnboardingDialog> {
     );
 
     try {
-      // 1. Salvar currículo atualizado usando o SDK
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(widget.userCpf)
-          .update({
-            'curriculum_completo_dados': jsonEncode(_curriculumData),
-          });
+      // 1. Salvar currículo atualizado via SDK
+      await FirebaseFirestore.instance.collection('users').doc(widget.userCpf).update({
+        'curriculum_completo_dados': jsonEncode(_curriculumData),
+      });
 
-      // 2. Salvar inscrição na coleção 'applications' com status tarefa_aprovada usando o SDK
+      // 2. Salvar inscrição na coleção 'applications' com status tarefa_aprovada via SDK
       final answersMap = <String, dynamic>{};
       for (int i = 0; i < _questions.length; i++) {
         final q = _questions[i];
@@ -617,9 +615,7 @@ class _OnboardingDialogState extends State<_OnboardingDialog> {
       }
 
       final now = DateTime.now().toIso8601String();
-      final appRef = FirebaseFirestore.instance.collection('applications').doc();
-      await appRef.set({
-        'id': appRef.id,
+      await FirebaseFirestore.instance.collection('applications').add({
         'promoterCpf': widget.userCpf,
         'demandId': widget.demand.id,
         'storeName': widget.demand.storeName,
@@ -637,18 +633,16 @@ class _OnboardingDialogState extends State<_OnboardingDialog> {
         'questionnaireAnswers': jsonEncode(answersMap),
       });
 
-      // 3. Atualizar a demanda no Firestore (incrementando filledVagas e definindo assignedPromoter)
+      // 3. Atualizar a demanda no Firestore (incrementando filledVagas e definindo assignedPromoter) via SDK
       final newFilled = widget.demand.filledVagas + 1;
       final newStatus = newFilled >= widget.demand.totalVagas ? 'PREENCHIDAS' : widget.demand.status;
 
-      await FirebaseFirestore.instance
-          .collection('demands')
-          .doc(widget.demand.id)
-          .update({
-            'filledVagas': newFilled,
-            'assignedPromoter': _promoterName,
-            'status': newStatus,
-          });
+      await FirebaseFirestore.instance.collection('demands').doc(widget.demand.id).update({
+        'filledVagas': newFilled,
+        'assignedPromoter': _promoterName,
+        'status': newStatus,
+      });
+
     } catch (e) {
       print('Erro ao salvar inscrição e atualizar demanda: $e');
       if (mounted) {

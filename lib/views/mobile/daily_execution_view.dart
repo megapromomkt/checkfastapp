@@ -86,7 +86,7 @@ class _DailyExecutionViewState extends State<DailyExecutionView> {
     return Container(
       padding: const EdgeInsets.all(40),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: _checkedIn ? AppColors.primaryBlue : AppColors.cardBorder, width: 2),
         boxShadow: [
@@ -152,7 +152,7 @@ class _DailyExecutionViewState extends State<DailyExecutionView> {
       showDialog(
         context: context, 
         builder: (c) => AlertDialog(
-          backgroundColor: Colors.white,
+          backgroundColor: AppColors.surface,
           surfaceTintColor: Colors.transparent,
           title: const Row(
             children: [

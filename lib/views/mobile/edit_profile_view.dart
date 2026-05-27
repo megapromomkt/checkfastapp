@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import '../../core/constants/premium_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class EditProfileView extends StatefulWidget {
   const EditProfileView({super.key});
@@ -19,6 +23,7 @@ class _EditProfileViewState extends State<EditProfileView> {
   final _cityController = TextEditingController();
   final _bairroController = TextEditingController();
   final _ufController = TextEditingController();
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -29,10 +34,10 @@ class _EditProfileViewState extends State<EditProfileView> {
   void _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _nameController.text = prefs.getString('user_name') ?? 'Ricardo Souza';
-      _cpfController.text = prefs.getString('user_cpf') ?? '123.456.789-00';
-      _emailController.text = prefs.getString('user_email') ?? 'ricardo.souza@email.com';
-      _phoneController.text = prefs.getString('user_phone') ?? '(11) 98765-4321';
+      _nameController.text = prefs.getString('user_name') ?? '';
+      _cpfController.text = prefs.getString('user_cpf') ?? '';
+      _emailController.text = prefs.getString('user_email') ?? '';
+      _phoneController.text = prefs.getString('user_phone') ?? '';
       _cepController.text = prefs.getString('user_cep') ?? '';
       _cityController.text = prefs.getString('user_city') ?? '';
       _bairroController.text = prefs.getString('user_bairro') ?? '';
@@ -76,18 +81,51 @@ class _EditProfileViewState extends State<EditProfileView> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () async {
-                  final prefs = await SharedPreferences.getInstance();
-                  await prefs.setString('user_name', _nameController.text);
-                  await prefs.setString('user_email', _emailController.text);
-                  await prefs.setString('user_phone', _phoneController.text);
-                  await prefs.setString('user_cep', _cepController.text);
-                  await prefs.setString('user_city', _cityController.text);
-                  await prefs.setString('user_bairro', _bairroController.text);
-                  await prefs.setString('user_uf', _ufController.text);
+                onPressed: _isSaving ? null : () async {
+                  final cleanCPF = _cpfController.text.replaceAll(RegExp(r'\D'), '');
                   
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Dados atualizados com sucesso!'), backgroundColor: AppColors.success));
-                  Navigator.pop(context);
+                  if (cleanCPF.isEmpty) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('CPF inválido.'), backgroundColor: Colors.redAccent));
+                    }
+                    return;
+                  }
+
+                  setState(() => _isSaving = true);
+
+                  try {
+                    final prefs = await SharedPreferences.getInstance();
+                    // Salva localmente
+                    await prefs.setString('user_name', _nameController.text);
+                    await prefs.setString('user_email', _emailController.text);
+                    await prefs.setString('user_phone', _phoneController.text);
+                    await prefs.setString('user_cep', _cepController.text);
+                    await prefs.setString('user_city', _cityController.text);
+                    await prefs.setString('user_bairro', _bairroController.text);
+                    await prefs.setString('user_uf', _ufController.text);
+                    
+                    // Salva no Firestore via SDK (evita cota de API REST e token manual)
+                    await FirebaseFirestore.instance.collection('users').doc(cleanCPF).update({
+                      'name': _nameController.text,
+                      'email': _emailController.text,
+                      'phone': _phoneController.text,
+                      'address_city': _cityController.text,
+                      'address_bairro': _bairroController.text,
+                      'address_cep': _cepController.text,
+                      'address_uf': _ufController.text,
+                    });
+                    
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Dados atualizados com sucesso!'), backgroundColor: AppColors.success));
+                      Navigator.pop(context);
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao salvar: ${e.toString().replaceAll('Exception: ', '')}'), backgroundColor: Colors.redAccent));
+                    }
+                  } finally {
+                    if (mounted) setState(() => _isSaving = false);
+                  }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryBlue,
@@ -96,7 +134,9 @@ class _EditProfileViewState extends State<EditProfileView> {
                   padding: const EdgeInsets.all(22),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text('SALVAR ALTERAÇÕES', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+                child: _isSaving
+                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : const Text('SALVAR ALTERAÇÕES', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.5)),
               ),
             ),
           ],

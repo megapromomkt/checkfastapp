@@ -2,15 +2,23 @@ import 'package:flutter/material.dart';
 import '../../core/utils/responsive.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import '../../core/constants/premium_theme.dart';
+import '../../core/services/security_service.dart';
 import 'welcome_demands_modal.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/user_model.dart';
 import '../../core/services/firebase_service.dart';
-import '../../core/services/security_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+
+// Helper para mostrar snackbar sem usar context depois de async
+void _showSnack(BuildContext context, String msg, {Color? bg}) {
+  if (!context.mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text(msg), backgroundColor: bg ?? Colors.redAccent),
+  );
+}
 
 class AuthModals {
   static void showPromoterLogin(BuildContext context) {
@@ -24,61 +32,141 @@ class AuthModals {
         
         return StatefulBuilder(
           builder: (context, setState) {
+            bool _isLoading = false;
+
             void submitForm() async {
               if (cpfController.text.isEmpty || passwordController.text.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Por favor, preencha CPF e Senha.'), backgroundColor: Colors.orange)
-                );
+                _showSnack(context, 'Por favor, preencha CPF e Senha.', bg: Colors.orange);
                 return;
               }
               
               final cleanCPF = cpfController.text.replaceAll(RegExp(r'\D'), '');
               if (cleanCPF.length != 11) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('CPF inválido. Digite os 11 números.'), backgroundColor: Colors.redAccent)
-                );
+                _showSnack(context, 'CPF inválido. Digite os 11 números.');
                 return;
               }
 
+              setState(() => _isLoading = true);
+
               try {
-                // Busca os dados do usuário usando o SDK do Firestore para evitar quota REST (429)
-                final doc = await FirebaseFirestore.instance.collection('users').doc(cleanCPF).get();
-                
-                if (!doc.exists) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('CPF não cadastrado.'), backgroundColor: Colors.redAccent)
+                // 1. Tenta logar via Firebase Authentication primeiro
+                UserCredential? credential;
+                final email = '$cleanCPF@checkfast.com';
+                try {
+                  credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+                    email: email,
+                    password: passwordController.text,
                   );
-                  return;
+                } catch (authError) {
+                  // Se falhar, faremos a Lazy Migration via Firestore SDK (sem quota REST)
+                  print('Auth falhou, tentando migração: $authError');
                 }
-                
-                final data = doc.data() as Map<String, dynamic>;
-                final storedPassword = data['password']?.toString() ?? '';
-                final name = data['name']?.toString() ?? '';
-                final city = data['address_city']?.toString() ?? '';
-                final bairro = data['address_bairro']?.toString() ?? '';
-                final email = data['email']?.toString() ?? '';
-                final phone = data['phone']?.toString() ?? '';
-                final cep = (data['cep'] != null && data['cep'].toString().isNotEmpty)
-                    ? data['cep'].toString()
-                    : (data['address_cep']?.toString() ?? '');
-                final uf = data['address_uf']?.toString() ?? '';
-                final rua = data['address_rua']?.toString() ?? '';
-                
-                // Verifica senha — suporta hash SHA-256 (cadastrado pelo admin) e texto simples (cadastro próprio)
-                if (!SecurityService.verifyPassword(passwordController.text, storedPassword)) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Senha incorreta.'), backgroundColor: Colors.redAccent)
+
+                String? idToken;
+                Map<String, dynamic>? fields;
+
+                if (credential != null) {
+                  // Logado com sucesso via Firebase Auth!
+                  idToken = await credential.user?.getIdToken();
+                  
+                  // Busca os dados do usuário usando o SDK do Firestore (evita quota REST)
+                  DocumentSnapshot doc;
+                  try {
+                    doc = await FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(cleanCPF)
+                        .get();
+                  } catch (firestoreErr) {
+                    throw Exception('Erro ao acessar banco de dados: $firestoreErr');
+                  }
+
+                  if (!doc.exists) {
+                    // Usuário excluído do Firestore, desloga do Auth
+                    await FirebaseAuth.instance.signOut();
+                    setState(() => _isLoading = false);
+                    _showSnack(context, 'Usuário não cadastrado no banco de dados.');
+                    return;
+                  }
+
+                  final docData = doc.data() as Map<String, dynamic>;
+                  fields = {};
+                  docData.forEach((key, value) {
+                    fields![key] = {'stringValue': value?.toString() ?? ''};
+                  });
+                } else {
+                  // ============================================================
+                  // LAZY MIGRATION: usa SDK do Firestore (não REST API sem token)
+                  // Isso evita o erro 429 de quota esgotada.
+                  // ============================================================
+                  DocumentSnapshot doc;
+                  try {
+                    doc = await FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(cleanCPF)
+                        .get();
+                  } catch (firestoreErr) {
+                    throw Exception('Erro ao acessar banco de dados: $firestoreErr');
+                  }
+
+                  if (!doc.exists) {
+                    setState(() => _isLoading = false);
+                    _showSnack(context, 'CPF não cadastrado.');
+                    return;
+                  }
+
+                  final docData = doc.data() as Map<String, dynamic>;
+                  // Converte o formato SDK para o formato fields usado abaixo
+                  fields = {};
+                  docData.forEach((key, value) {
+                    fields![key] = {'stringValue': value?.toString() ?? ''};
+                  });
+
+                  final storedPassword = docData['password']?.toString() ?? '';
+                  if (storedPassword.isEmpty || !SecurityService.verifyPassword(passwordController.text, storedPassword)) {
+                    setState(() => _isLoading = false);
+                    _showSnack(context, 'Senha incorreta.');
+                    return;
+                  }
+
+                  // Credenciais locais válidas! Migra para o Firebase Auth
+                  final newCred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+                    email: email,
+                    password: passwordController.text,
                   );
-                  return;
+                  final authUid = newCred.user!.uid;
+                  idToken = await newCred.user?.getIdToken();
+
+                  // Atualiza o documento com o authUid e senha em hash via SDK
+                  final hashedPassword = SecurityService.hashPassword(passwordController.text);
+                  await FirebaseFirestore.instance.collection('users').doc(cleanCPF).update({
+                    'authUid': authUid,
+                    'password': hashedPassword,
+                  });
+
+                  // Atualiza localmente a representação dos dados
+                  fields['authUid'] = {'stringValue': authUid};
+                  fields['password'] = {'stringValue': hashedPassword};
                 }
 
                 // Salva os dados na sessão local do navegador
+                final userFields = fields!;
+                final name = userFields['name']['stringValue'];
+                final city = userFields['address_city'] != null ? userFields['address_city']['stringValue'] : '';
+                final bairro = userFields['address_bairro'] != null ? userFields['address_bairro']['stringValue'] : '';
+                final emailVal = userFields['email'] != null ? userFields['email']['stringValue'] : '';
+                final phone = userFields['phone'] != null ? userFields['phone']['stringValue'] : '';
+                final cep = (userFields['cep'] != null && userFields['cep']['stringValue'].toString().isNotEmpty)
+                    ? userFields['cep']['stringValue']
+                    : (userFields['address_cep'] != null ? userFields['address_cep']['stringValue'] : '');
+                final uf = userFields['address_uf'] != null ? userFields['address_uf']['stringValue'] : '';
+                final rua = userFields['address_rua'] != null ? userFields['address_rua']['stringValue'] : '';
+
                 final prefs = await SharedPreferences.getInstance();
                 await prefs.setString('user_cpf', cleanCPF);
                 await prefs.setString('user_name', name);
                 await prefs.setString('user_city', city);
                 await prefs.setString('user_bairro', bairro);
-                await prefs.setString('user_email', email);
+                await prefs.setString('user_email', emailVal);
                 await prefs.setString('user_phone', phone);
                 await prefs.setString('user_cep', cep);
                 await prefs.setString('user_uf', uf);
@@ -87,17 +175,22 @@ class AuthModals {
                 Navigator.pop(context);
                 Navigator.pushReplacementNamed(context, '/promoter');
               } catch (e) {
-                final msg = e.toString();
-                final isQuota = msg.contains('RESOURCE_EXHAUSTED') || msg.contains('quota') || msg.contains('429');
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(isQuota 
-                      ? 'Serviço temporariamente indisponível. Tente novamente em alguns instantes.'
-                      : 'Erro ao fazer login. Verifique CPF e senha.'
-                    ),
-                    backgroundColor: Colors.redAccent,
-                  )
-                );
+                setState(() => _isLoading = false);
+                String errMsg = e.toString();
+                if (errMsg.contains('quota') || errMsg.contains('RESOURCE_EXHAUSTED') || errMsg.contains('429')) {
+                  errMsg = 'Serviço temporariamente sobrecarregado. Aguarde alguns minutos e tente novamente.';
+                } else if (errMsg.contains('network') || errMsg.contains('SocketException')) {
+                  errMsg = 'Sem conexão com a internet. Verifique sua rede.';
+                } else if (errMsg.contains('wrong-password') || errMsg.contains('invalid-credential')) {
+                  errMsg = 'CPF ou senha incorretos.';
+                } else if (errMsg.contains('user-not-found')) {
+                  errMsg = 'CPF não cadastrado no sistema.';
+                } else if (errMsg.contains('too-many-requests')) {
+                  errMsg = 'Muitas tentativas. Aguarde alguns minutos.';
+                }
+                _showSnack(context, errMsg);
+              } finally {
+                if (context.mounted) setState(() => _isLoading = false);
               }
             }
 
@@ -193,7 +286,7 @@ class AuthModals {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: submitForm,
+                        onPressed: _isLoading ? null : submitForm,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primaryBlue,
                           foregroundColor: Colors.white,
@@ -201,7 +294,9 @@ class AuthModals {
                           padding: const EdgeInsets.all(22),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
                         ),
-                        child: const Text('ENTRAR NO SISTEMA', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.5))
+                        child: _isLoading
+                          ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          : const Text('ENTRAR NO SISTEMA', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.5))
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -796,12 +891,25 @@ class _RegisterDialogState extends State<_RegisterDialog> {
                   Expanded(
                     child: ElevatedButton(
                         onPressed: () async {
-                          // Validação de campos vazios básica
-                          if (_nameController.text.isEmpty || 
-                              _cpfController.text.isEmpty || 
-                              _phoneController.text.isEmpty ||
-                              _passwordController.text.isEmpty ||
-                              _confirmPasswordController.text.isEmpty) {
+                          // Validação de todos os campos obrigatórios
+                          if (_nameController.text.trim().isEmpty || 
+                              _phoneController.text.trim().isEmpty ||
+                              _birthController.text.trim().isEmpty ||
+                              _cpfController.text.trim().isEmpty ||
+                              _cepController.text.trim().isEmpty ||
+                              _addressController.text.trim().isEmpty ||
+                              _bairroController.text.trim().isEmpty ||
+                              _cityController.text.trim().isEmpty ||
+                              _ufController.text.trim().isEmpty ||
+                              _emergencyNameController.text.trim().isEmpty ||
+                              _emergencyPhoneController.text.trim().isEmpty ||
+                              _pixController.text.trim().isEmpty ||
+                              _bankController.text.trim().isEmpty ||
+                              _agencyController.text.trim().isEmpty ||
+                              _accountController.text.trim().isEmpty ||
+                              _digitController.text.trim().isEmpty ||
+                              _passwordController.text.trim().isEmpty ||
+                              _confirmPasswordController.text.trim().isEmpty) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(content: Text('Por favor, preencha todos os campos obrigatórios.'), backgroundColor: Colors.orange)
                             );
@@ -832,13 +940,25 @@ class _RegisterDialogState extends State<_RegisterDialog> {
                             return;
                           }
 
-                          // Salva no Firestore de forma achatada (Flatten) para evitar erro de tipo no JS
                           final cleanCPF = _cpfController.text.replaceAll(RegExp(r'\D'), '');
                           
                           try {
+                            // 1. Cria o usuário no Firebase Authentication
+                            final email = '$cleanCPF@checkfast.com';
+                            final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+                              email: email,
+                              password: _passwordController.text,
+                            );
+                            final authUid = credential.user!.uid;
+
+                            // Desloga imediatamente para não influenciar a sessão atual
+                            await FirebaseAuth.instance.signOut();
+
                             // Prepara os dados achatados
+                            final hashedPassword = SecurityService.hashPassword(_passwordController.text);
                             final flatData = <String, String>{
                               'id': cleanCPF,
+                              'authUid': authUid,
                               'role': 'worker',
                               'name': _nameController.text,
                               'phone': _phoneController.text,
@@ -856,12 +976,12 @@ class _RegisterDialogState extends State<_RegisterDialog> {
                               'bank_agency': _agencyController.text,
                               'bank_account': _accountController.text,
                               'bank_digit': _digitController.text,
-                              'password': _passwordController.text,
-                              'status': 'Aprovado',
+                              'password': hashedPassword,
+                              'status': 'Ativo',
                               'createdAt': DateTime.now().toIso8601String(),
                             };
 
-                            // Salva usando o SDK do Firestore
+                            // Envia via SDK do Firestore (evita quota REST e problemas de permissão/token)
                             await FirebaseFirestore.instance.collection('users').doc(cleanCPF).set(flatData);
                           } catch (e) {
                             ScaffoldMessenger.of(context).showSnackBar(

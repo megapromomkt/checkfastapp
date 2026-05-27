@@ -1,36 +1,31 @@
 import 'package:flutter/material.dart';
-import '../utils/responsive.dart';
 
 class AppColors {
-  // Brand Colors
-  static const primaryBlue = Color(0xFF0066FF);
-  static const deepBlue = Color(0xFF0047B3);
-  static const lightBlue = Color(0xFFE6F0FF);
+  static const spaceBlack = Color(0xFF0B0F1A);
+  static const cardDark = Color(0xFF111827);
+  static const neonCyan = Color(0xFF00B8FF);
+  static const electricBlue = Color(0xFF146EF5);
+  static const successEmerald = Color(0xFF22C55E);
+  static const textSecondary = Color(0xFF94A3B8);
+  static const glassBorderDark = Color(0xFF1F2937);
+  static const alertOrange = Color(0xFFF59E0B);
+
+  // New aliases to support components using the new design system names but in Dark Mode
+  static const primaryBlue = neonCyan;
+  static const deepBlue = electricBlue;
+  static const lightBlue = Color(0xFF1E293B);
   
-  // Background & Surfaces
-  static const background = Color(0xFFF8FAFC);
-  static const surface = Colors.white;
-  static const cardBorder = Color(0xFFE2E8F0);
+  static const background = spaceBlack;
+  static const surface = cardDark;
+  static const cardBorder = glassBorderDark;
   
-  // Text Colors
-  static const textPrimary = Color(0xFF1E293B);
-  static const textSecondary = Color(0xFF64748B);
-  static const textOnPrimary = Colors.white;
+  static const textPrimary = Colors.white;
+  static const textOnPrimary = spaceBlack;
   
-  // States
-  static const success = Color(0xFF10B981);
-  static const warning = Color(0xFFF59E0B);
+  static const success = successEmerald;
+  static const warning = alertOrange;
   static const error = Color(0xFFEF4444);
   static const info = Color(0xFF3B82F6);
-
-  // Legacy mappings (to prevent breaking code while migrating)
-  static const spaceBlack = background;
-  static const cardDark = surface;
-  static const neonCyan = primaryBlue;
-  static const electricBlue = deepBlue;
-  static const glassBorderDark = cardBorder;
-  static const successEmerald = success;
-  static const alertOrange = warning;
 }
 
 class PremiumCard extends StatelessWidget {
@@ -40,25 +35,16 @@ class PremiumCard extends StatelessWidget {
   const PremiumCard({super.key, required this.child, this.padding, this.borderColor});
 
   @override
-  Widget build(BuildContext context) {
-    final defaultPad = Responsive.isMobile(context) ? 16.0 : 24.0;
-    return Container(
-      padding: padding ?? EdgeInsets.all(defaultPad),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borderColor ?? AppColors.cardBorder),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF1E293B).withOpacity(0.05),
-            blurRadius: 15,
-            offset: const Offset(0, 4),
-          )
-        ],
-      ),
-      child: child,
-    );
-  }
+  Widget build(BuildContext context) => Container(
+    padding: padding ?? const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: AppColors.cardDark,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: borderColor ?? AppColors.glassBorderDark),
+      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 4))]
+    ),
+    child: child,
+  );
 }
 
 class PremiumHeader extends StatelessWidget {
@@ -67,55 +53,17 @@ class PremiumHeader extends StatelessWidget {
   const PremiumHeader({super.key, required this.title, required this.subtitle, this.actions});
 
   @override
-  Widget build(BuildContext context) {
-    final mobile = Responsive.isMobile(context);
-    final titleSize = Responsive.value<double>(context, mobile: 22, tablet: 26, desktop: 32);
-    final subtitleSize = Responsive.value<double>(context, mobile: 13, tablet: 14, desktop: 16);
-
-    final textBlock = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: TextStyle(
-          color: AppColors.textPrimary,
-          fontSize: titleSize,
-          fontWeight: FontWeight.w800,
-          letterSpacing: -0.8,
-        )),
-        const SizedBox(height: 4),
-        Text(subtitle, style: TextStyle(
-          color: AppColors.textSecondary,
-          fontSize: subtitleSize,
-          fontWeight: FontWeight.w400,
-        )),
-      ],
-    );
-
-    final actionsRow = actions != null
-        ? Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: actions!,
-          )
-        : null;
-
-    return Padding(
-      padding: EdgeInsets.only(bottom: mobile ? 20 : 32),
-      child: mobile
-          ? Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                textBlock,
-                if (actionsRow != null) ...[const SizedBox(height: 16), actionsRow],
-              ],
-            )
-          : Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(child: textBlock),
-                if (actionsRow != null) ...[const SizedBox(width: 16), actionsRow],
-              ],
-            ),
-    );
-  }
+  Widget build(BuildContext context) => Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold, letterSpacing: -0.5)),
+          Text(subtitle, style: const TextStyle(color: AppColors.textSecondary, fontSize: 14)),
+        ],
+      ),
+      if (actions != null) Row(children: actions!),
+    ],
+  );
 }

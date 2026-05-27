@@ -6,3 +6,15 @@
 .pub-cache/
 .pub/
 firebase-key.json
+scratch/
+auto_save.log
+*.ps1
+
+# Temporary scratch scripts
+calc_dist.dart
+geocode_db.dart
+print_cep_geocode.dart
+print_store_coords.dart
+print_users.dart
+scratch_demands.dart
+test_query.dart

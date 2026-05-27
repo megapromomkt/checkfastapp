@@ -9,10 +9,14 @@ import 'dart:typed_data';
 import 'dart:convert';
 import 'package:image/image.dart' as img;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:http/http.dart' as http;
 
 class CheckInTabView extends StatefulWidget {
   final bool isDesktop;
-  const CheckInTabView({super.key, required this.isDesktop});
+  final String userCpf;
+  const CheckInTabView({super.key, required this.isDesktop, required this.userCpf});
 
   @override
   State<CheckInTabView> createState() => _CheckInTabViewState();
@@ -33,6 +37,90 @@ class _CheckInTabViewState extends State<CheckInTabView> {
   Timer? _timer;
 
   final ImagePicker _picker = ImagePicker();
+
+  Map<String, dynamic>? _activeApplication;
+  bool _isLoadingApp = true;
+  String _errorMessage = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadActiveApplication();
+  }
+
+  Future<void> _loadActiveApplication() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoadingApp = true;
+      _errorMessage = '';
+    });
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('applications')
+          .where('promoterCpf', isEqualTo: widget.userCpf)
+          .orderBy('submittedAt', descending: true)
+          .get();
+
+      Map<String, dynamic>? active;
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        final status = data['status']?.toString() ?? '';
+        
+        if (status == 'tarefa_aprovada' || status == 'em_andamento' || status == 'em_analise' || status == 'liberado_pagamento' || status == 'pago' || status == 'nao_aprovada') {
+          active = {
+            'id': doc.id,
+            'storeName':   data['storeName']?.toString() ?? '',
+            'network':     data['network']?.toString() ?? '',
+            'role':        data['role']?.toString() ?? '',
+            'date':        data['date']?.toString() ?? '',
+            'timeRange':   data['timeRange']?.toString() ?? '',
+            'value':       (data['value'] ?? 0).toDouble(),
+            'status':      status,
+            'address':     data['address']?.toString() ?? '',
+            'latitude':    (data['latitude'] ?? -23.5275).toDouble(),
+            'longitude':   (data['longitude'] ?? -46.6853).toDouble(),
+            'checkInTime': data['checkInTime']?.toString() ?? '',
+            'checkOutTime': data['checkOutTime']?.toString() ?? '',
+          };
+          break;
+        }
+      }
+      
+      if (mounted) {
+        setState(() {
+          _activeApplication = active;
+          _isLoadingApp = false;
+          if (active != null) {
+            final status = active['status'];
+            if (status == 'em_andamento') {
+              _isCheckedIn = true;
+              _isCheckedOut = false;
+              if (active['checkInTime'].toString().isNotEmpty) {
+                try {
+                  final checkInDt = DateTime.parse(active['checkInTime']);
+                  _elapsedTime = DateTime.now().difference(checkInDt);
+                  _startTimer();
+                } catch (_) {}
+              }
+            } else if (status == 'em_analise' || status == 'liberado_pagamento' || status == 'pago' || status == 'nao_aprovada') {
+              _isCheckedIn = true;
+              _isCheckedOut = true;
+            } else {
+              _isCheckedIn = false;
+              _isCheckedOut = false;
+            }
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingApp = false;
+          _errorMessage = 'Erro ao carregar jornada.';
+        });
+      }
+    }
+  }
 
   Future<void> _verifyLocation() async {
     setState(() => _isLoadingLocation = true);
@@ -63,9 +151,9 @@ class _CheckInTabViewState extends State<CheckInTabView> {
     try {
       Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
       
-      // Coordenadas do Atacadão Lapa (Rua Clélia, 2200)
-      const double storeLat = -23.5275;
-      const double storeLng = -46.6853;
+      // Coordenadas da Loja
+      final double storeLat = _activeApplication?['latitude'] ?? -23.5275;
+      final double storeLng = _activeApplication?['longitude'] ?? -46.6853;
       
       double distance = Geolocator.distanceBetween(
         position.latitude,
@@ -147,34 +235,51 @@ class _CheckInTabViewState extends State<CheckInTabView> {
       _showError('Tire pelo menos uma foto para confirmar.');
       return;
     }
+    if (_activeApplication == null) {
+      _showError('Nenhuma jornada ativa carregada.');
+      return;
+    }
     
     setState(() => _isCheckingIn = true);
     
-    // Simula o upload da foto e da localização pro Firebase
-    await Future.delayed(const Duration(seconds: 2));
+    final now = DateTime.now().toIso8601String();
     
-    HapticFeedback.heavyImpact();
-    
-    // Salva a presença no SharedPreferences para o Gerente ler
-    final prefs = await SharedPreferences.getInstance();
-    final presenceData = jsonEncode({
-      'id': 'p1',
-      'demandId': 'd1',
-      'promoterName': 'Thabata Reco',
-      'storeName': 'ATACADÃO LAPA',
-      'checkInTime': '${DateTime.now().hour.toString().padLeft(2,'0')}:${DateTime.now().minute.toString().padLeft(2,'0')}',
-      'checkOutTime': '--:--',
-      'gpsValid': true,
-      'photoValid': true,
-      'status': 'EM ANDAMENTO',
-    });
-    await prefs.setString('current_presence', presenceData);
+    try {
+      // Envia via SDK do Firestore (evita cota de API REST e token manual)
+      await FirebaseFirestore.instance.collection('applications').doc(_activeApplication!['id']).update({
+        'status': 'em_andamento',
+        'checkInTime': now,
+        'updatedAt': now,
+      });
+      
+      HapticFeedback.heavyImpact();
+      
+      final prefs = await SharedPreferences.getInstance();
+      final presenceData = jsonEncode({
+        'id': _activeApplication!['id'],
+        'demandId': _activeApplication!['demandId'] ?? '',
+        'promoterName': 'Promotor',
+        'storeName': _activeApplication!['storeName'] ?? '',
+        'checkInTime': '${DateTime.now().hour.toString().padLeft(2,'0')}:${DateTime.now().minute.toString().padLeft(2,'0')}',
+        'checkOutTime': '--:--',
+        'gpsValid': true,
+        'photoValid': true,
+        'status': 'EM ANDAMENTO',
+      });
+      await prefs.setString('current_presence', presenceData);
 
-    setState(() {
-      _isCheckingIn = false;
-      _isCheckedIn = true;
-      _startTimer();
-    });
+      setState(() {
+        _isCheckingIn = false;
+        _isCheckedIn = true;
+        _elapsedTime = Duration.zero;
+        _startTimer();
+        _activeApplication!['status'] = 'em_andamento';
+        _activeApplication!['checkInTime'] = now;
+      });
+    } catch (e) {
+      _showError('Erro ao realizar check-in: $e');
+      setState(() => _isCheckingIn = false);
+    }
   }
 
   void _startTimer() {
@@ -205,6 +310,22 @@ class _CheckInTabViewState extends State<CheckInTabView> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoadingApp) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(40.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(color: AppColors.primaryBlue),
+              SizedBox(height: 16),
+              Text('Carregando jornada...', style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
+            ],
+          ),
+        ),
+      );
+    }
+
     return SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
@@ -257,8 +378,8 @@ class _CheckInTabViewState extends State<CheckInTabView> {
                         label: 'CHECK-IN',
                         icon: IconsaxPlusLinear.login,
                         color: _isCheckedIn ? AppColors.success : AppColors.primaryBlue,
-                        isActive: !_isCheckedIn,
-                        onPressed: _isCheckedIn ? null : _verifyLocationAndCheckIn,
+                        isActive: !_isCheckedIn && _activeApplication != null && _activeApplication!['status'] == 'tarefa_aprovada',
+                        onPressed: (_isCheckedIn || _activeApplication == null || _activeApplication!['status'] != 'tarefa_aprovada') ? null : _verifyLocationAndCheckIn,
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -267,8 +388,8 @@ class _CheckInTabViewState extends State<CheckInTabView> {
                         label: 'CHECKOUT',
                         icon: IconsaxPlusLinear.logout,
                         color: Colors.redAccent,
-                        isActive: _isCheckedIn && !_isCheckedOut,
-                        onPressed: (_isCheckedIn && !_isCheckedOut) ? _verifyLocationAndCheckout : null,
+                        isActive: _isCheckedIn && !_isCheckedOut && _activeApplication != null && _activeApplication!['status'] == 'em_andamento',
+                        onPressed: (_isCheckedIn && !_isCheckedOut && _activeApplication != null && _activeApplication!['status'] == 'em_andamento') ? _verifyLocationAndCheckout : null,
                       ),
                     ),
                   ],
@@ -298,11 +419,39 @@ class _CheckInTabViewState extends State<CheckInTabView> {
   }
 
   Widget _buildDemandaCard() {
+    if (_activeApplication == null) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.cardBorder),
+        ),
+        child: const Column(
+          children: [
+            Icon(IconsaxPlusLinear.info_circle, color: Colors.orangeAccent, size: 48),
+            SizedBox(height: 16),
+            Text(
+              'Aguardando Aprovação',
+              style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Nenhuma vaga com status "Tarefa Aprovada" encontrada. Você poderá fazer Check-in assim que o RH liberar a sua contratação.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.cardBorder),
         boxShadow: [
@@ -323,13 +472,13 @@ class _CheckInTabViewState extends State<CheckInTabView> {
                 child: const Icon(IconsaxPlusLinear.shop, color: AppColors.primaryBlue, size: 24),
               ),
               const SizedBox(width: 16),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Demanda do Dia', style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w700)),
-                    SizedBox(height: 2),
-                    Text('ATACADÃO LAPA', style: TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.w900)),
+                    const Text('Demanda do Dia', style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 2),
+                    Text(_activeApplication!['storeName'] ?? '', style: const TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.w900)),
                   ],
                 ),
               ),
@@ -338,12 +487,12 @@ class _CheckInTabViewState extends State<CheckInTabView> {
           const SizedBox(height: 16),
           const Divider(color: AppColors.cardBorder),
           const SizedBox(height: 16),
-          const Row(
+          Row(
             children: [
-              Icon(IconsaxPlusLinear.location, color: AppColors.textSecondary, size: 16),
-              SizedBox(width: 8),
+              const Icon(IconsaxPlusLinear.location, color: AppColors.textSecondary, size: 16),
+              const SizedBox(width: 8),
               Expanded(
-                child: Text('Rua Clélia, 2200 - Lapa, São Paulo - SP', style: TextStyle(color: AppColors.textSecondary, fontSize: 14, fontWeight: FontWeight.w500)),
+                child: Text(_activeApplication!['address'] ?? '', style: const TextStyle(color: AppColors.textSecondary, fontSize: 14, fontWeight: FontWeight.w500)),
               ),
             ],
           ),
@@ -487,12 +636,48 @@ class _CheckInTabViewState extends State<CheckInTabView> {
   }
 
   Future<void> _submitCheckout() async {
+    if (_checkoutPhotos.isEmpty) {
+      _showError('Tire pelo menos uma foto para confirmar o checkout.');
+      return;
+    }
+    if (_activeApplication == null) {
+      _showError('Nenhuma jornada ativa carregada.');
+      return;
+    }
+    
     setState(() => _isCheckingOut = true);
-    await Future.delayed(const Duration(seconds: 2));
-    _timer?.cancel();
-    setState(() {
-      _isCheckingOut = false;
-      _isCheckedOut = true;
-    });
+    final now = DateTime.now().toIso8601String();
+    
+    try {
+      // Envia via SDK do Firestore (evita cota de API REST e token manual)
+      await FirebaseFirestore.instance.collection('applications').doc(_activeApplication!['id']).update({
+        'status': 'em_analise',
+        'checkOutTime': now,
+        'updatedAt': now,
+      });
+
+      _timer?.cancel();
+      
+      final prefs = await SharedPreferences.getInstance();
+      final rawPres = prefs.getString('current_presence');
+      if (rawPres != null) {
+        try {
+          final data = jsonDecode(rawPres) as Map<String, dynamic>;
+          data['checkOutTime'] = '${DateTime.now().hour.toString().padLeft(2,'0')}:${DateTime.now().minute.toString().padLeft(2,'0')}';
+          data['status'] = 'EM ANALISE';
+          await prefs.setString('current_presence', jsonEncode(data));
+        } catch (_) {}
+      }
+      
+      setState(() {
+        _isCheckingOut = false;
+        _isCheckedOut = true;
+        _activeApplication!['status'] = 'em_analise';
+        _activeApplication!['checkOutTime'] = now;
+      });
+    } catch (e) {
+      _showError('Erro de rede: $e');
+      setState(() => _isCheckingOut = false);
+    }
   }
 }
