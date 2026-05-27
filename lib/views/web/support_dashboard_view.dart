@@ -5,6 +5,9 @@ import 'package:iconsax_plus/iconsax_plus.dart';
 import '../../core/constants/premium_theme.dart';
 import 'dart:async';
 import 'dart:math';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Channel metadata (mirrors the provider app channels)
@@ -45,6 +48,7 @@ class _SupportDashboardViewState extends State<SupportDashboardView> {
 
   // ── Quick replies loaded for the current chat channel ─────────────────────
   List<String> _quickReplies = [];
+  bool _isUploadingChatFile = false;
 
   @override
   void initState() {
@@ -245,6 +249,103 @@ class _SupportDashboardViewState extends State<SupportDashboardView> {
         _scrollToBottom();
       }
     });
+  }
+
+  void _pickAndSendFile() async {
+    if (_isUploadingChatFile || _selectedChatId == null) return;
+
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+        withData: true,
+      );
+
+      if (result == null || result.files.isEmpty) return;
+
+      final file = result.files.single;
+      final fileBytes = file.bytes;
+      if (fileBytes == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('⚠️ Não foi possível ler os dados do arquivo.'), backgroundColor: Colors.orange),
+        );
+        return;
+      }
+
+      setState(() => _isUploadingChatFile = true);
+
+      final chatId = _selectedChatId!;
+      final fileName = file.name;
+      final fileExtension = fileName.split('.').last.toLowerCase();
+      
+      String contentType = 'application/octet-stream';
+      String type = 'file';
+      if (fileExtension == 'pdf') {
+        contentType = 'application/pdf';
+        type = 'pdf';
+      } else if (fileExtension == 'jpg' || fileExtension == 'jpeg') {
+        contentType = 'image/jpeg';
+        type = 'image';
+      } else if (fileExtension == 'png') {
+        contentType = 'image/png';
+        type = 'image';
+      }
+
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final pathRef = 'support_attachments/$chatId/${timestamp}_$fileName';
+
+      final storageRef = FirebaseStorage.instance.ref().child(pathRef);
+      final uploadTask = storageRef.putData(
+        fileBytes,
+        SettableMetadata(contentType: contentType),
+      );
+
+      final snapshot = await uploadTask;
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+
+      final now = DateTime.now().toIso8601String();
+      await FirebaseFirestore.instance
+          .collection('support_chats')
+          .doc(chatId)
+          .collection('messages')
+          .add({
+        'senderId': 'admin',
+        'senderName': _userName.isNotEmpty ? _userName : 'Suporte CheckFast',
+        'senderRole': 'admin',
+        'text': 'Anexo: $fileName',
+        'createdAt': now,
+        'read': false,
+        'fileUrl': downloadUrl,
+        'fileName': fileName,
+        'type': type,
+      });
+
+      await FirebaseFirestore.instance
+          .collection('support_chats')
+          .doc(chatId)
+          .set({
+        'lastMessage': '📄 [Anexo] $fileName',
+        'lastMessageTime': now,
+        'lastSenderRole': 'admin',
+        'unreadCountPromoter': FieldValue.increment(1),
+        'updatedAt': now,
+      }, SetOptions(merge: true));
+
+      _scrollToBottom();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('✨ Arquivo "$fileName" enviado com sucesso!'), backgroundColor: AppColors.success),
+      );
+    } catch (e) {
+      print('Erro ao enviar arquivo: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('❌ Erro ao enviar arquivo: $e'), backgroundColor: Colors.redAccent),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isUploadingChatFile = false);
+      }
+    }
   }
 
   // ── Send reply ─────────────────────────────────────────────────────────────
@@ -704,6 +805,127 @@ class _SupportDashboardViewState extends State<SupportDashboardView> {
     );
   }
 
+  Widget _buildMessageContent(Map<String, dynamic> data, bool isMe) {
+    final text = data['text'] ?? '';
+    final fileUrl = data['fileUrl'] as String?;
+    final fileName = data['fileName'] as String?;
+    final type = data['type'] as String?;
+
+    if (fileUrl != null && fileUrl.isNotEmpty) {
+      if (type == 'image') {
+        return Column(
+          crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          children: [
+            GestureDetector(
+              onTap: () => launchUrl(Uri.parse(fileUrl), mode: LaunchMode.externalApplication),
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: Container(
+                  constraints: const BoxConstraints(maxHeight: 200, maxWidth: 200),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.network(
+                      fileUrl,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Container(
+                          width: 200,
+                          height: 150,
+                          color: isMe ? AppColors.primaryBlue.withOpacity(0.2) : Colors.grey.shade100,
+                          child: const Center(
+                            child: CircularProgressIndicator(color: AppColors.primaryBlue),
+                          ),
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          width: 200,
+                          height: 150,
+                          color: Colors.grey.shade200,
+                          child: const Icon(Icons.broken_image_rounded, size: 40, color: Colors.grey),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            if (text.isNotEmpty && text != 'Anexo: $fileName' && text != fileName) ...[
+              const SizedBox(height: 8),
+              Text(
+                text,
+                style: TextStyle(
+                  color: isMe ? Colors.white : AppColors.textPrimary,
+                  fontSize: 13,
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ],
+        );
+      } else {
+        final isPdf = type == 'pdf' || (fileName != null && fileName.toLowerCase().endsWith('.pdf'));
+        return InkWell(
+          onTap: () => launchUrl(Uri.parse(fileUrl), mode: LaunchMode.externalApplication),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: isMe ? Colors.white.withOpacity(0.15) : AppColors.background,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: isMe ? Colors.white24 : AppColors.cardBorder),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isPdf ? Icons.picture_as_pdf_rounded : Icons.insert_drive_file_rounded,
+                  color: isMe ? Colors.white : (isPdf ? Colors.redAccent : AppColors.primaryBlue),
+                  size: 24,
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        fileName ?? 'Documento',
+                        style: TextStyle(
+                          color: isMe ? Colors.white : AppColors.textPrimary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Visualizar arquivo',
+                        style: TextStyle(
+                          color: isMe ? Colors.white70 : AppColors.textSecondary,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+    }
+
+    return Text(
+      text,
+      style: TextStyle(
+        color: isMe ? Colors.white : AppColors.textPrimary,
+        fontSize: 13,
+        height: 1.3,
+      ),
+    );
+  }
+
   // ── Chat detail ────────────────────────────────────────────────────────────
   Widget _buildChatDetailSection({required bool isMobile}) {
     if (_selectedChatId == null) {
@@ -819,7 +1041,7 @@ class _SupportDashboardViewState extends State<SupportDashboardView> {
                             border: isMe ? null : Border.all(color: AppColors.cardBorder),
                             boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.01), blurRadius: 4, offset: const Offset(0, 2))],
                           ),
-                          child: Text(text, style: TextStyle(color: isMe ? Colors.white : AppColors.textPrimary, fontSize: 13, height: 1.3)),
+                          child: _buildMessageContent(m, isMe),
                         ),
                       );
                     },
@@ -883,18 +1105,37 @@ class _SupportDashboardViewState extends State<SupportDashboardView> {
                   Expanded(
                     child: Container(
                       decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(24), border: Border.all(color: AppColors.cardBorder)),
-                      child: TextField(
-                        controller: _replyController,
-                        style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
-                        maxLines: null,
-                        textInputAction: TextInputAction.send,
-                        onSubmitted: (_) => _sendReply(),
-                        decoration: const InputDecoration(
-                          hintText: 'Digite uma resposta...',
-                          hintStyle: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                        ),
+                      child: Row(
+                        children: [
+                          _isUploadingChatFile
+                              ? const Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 12),
+                                  child: SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primaryBlue),
+                                  ),
+                                )
+                              : IconButton(
+                                  icon: const Icon(Icons.attach_file_rounded, color: AppColors.textSecondary),
+                                  onPressed: _pickAndSendFile,
+                                ),
+                          Expanded(
+                            child: TextField(
+                              controller: _replyController,
+                              style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
+                              maxLines: null,
+                              textInputAction: TextInputAction.send,
+                              onSubmitted: (_) => _sendReply(),
+                              decoration: const InputDecoration(
+                                hintText: 'Digite uma resposta...',
+                                hintStyle: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                                border: InputBorder.none,
+                                contentPadding: EdgeInsets.only(left: 4, right: 16, top: 10, bottom: 10),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
