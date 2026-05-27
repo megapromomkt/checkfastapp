@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'dart:math' as math;
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -77,6 +78,11 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
   String _userRua = '';
   String _userEmail = '';
   String _userPhone = '';
+
+  // --- VARIÁVEIS DO CHAT DE SUPORTE (MENSAGENS) ---
+  final _chatMessageController = TextEditingController();
+  final _chatScrollController = ScrollController();
+  String _chatTopic = 'Operacional';
 
   // --- NOVAS VARIÁVEIS DO CURRÍCULO COMPLETO ---
   
@@ -738,6 +744,7 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
         _buildCheckInTab(isDesktop),
         _buildFinanceiroTab(isDesktop),
         _buildCurriculoTab(isDesktop),
+        _buildMensagensTab(isDesktop),
       ],
     );
 
@@ -798,6 +805,7 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
           BottomNavigationBarItem(icon: Icon(IconsaxPlusLinear.location), activeIcon: Icon(IconsaxPlusBold.location), label: 'Check-in'),
           BottomNavigationBarItem(icon: Icon(IconsaxPlusLinear.wallet_2), activeIcon: Icon(IconsaxPlusBold.wallet_2), label: 'Ganhos'),
           BottomNavigationBarItem(icon: Icon(IconsaxPlusLinear.document_text), activeIcon: Icon(IconsaxPlusBold.document_text), label: 'Currículo'),
+          BottomNavigationBarItem(icon: Icon(IconsaxPlusLinear.message_2), activeIcon: Icon(IconsaxPlusBold.message_2), label: 'Mensagens'),
         ],
       ),
     );
@@ -828,6 +836,7 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
           _buildSidebarItem(3, IconsaxPlusLinear.location, 'Jornada'),
           _buildSidebarItem(4, IconsaxPlusLinear.wallet_2, 'Financeiro'),
           _buildSidebarItem(5, IconsaxPlusLinear.document_text, 'Meu Currículo'),
+          _buildSidebarItem(6, IconsaxPlusLinear.message_2, 'Mensagens'),
           const Spacer(),
           Container(
             margin: const EdgeInsets.all(24),
@@ -2888,5 +2897,310 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
         );
       },
     );
+  }
+
+  Widget _buildMensagensTab(bool isDesktop) {
+    final cleanCPF = _userCpf.replaceAll(RegExp(r'\D'), '');
+
+    // Reset unread count for promoter when opening messages
+    FirebaseFirestore.instance
+        .collection('support_chats')
+        .doc(cleanCPF)
+        .update({'unreadCountPromoter': 0}).catchError((_) {});
+
+    return Container(
+      padding: EdgeInsets.all(isDesktop ? 24.0 : 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Suporte CheckFast',
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: isDesktop ? 28 : 22,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Fale diretamente com nossa equipe de suporte.',
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                  ),
+                ],
+              ),
+              // Topic selection
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.cardBorder),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _chatTopic,
+                    dropdownColor: AppColors.surface,
+                    style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 13),
+                    items: const [
+                      DropdownMenuItem(value: 'Operacional', child: Text('Canal: Operacional')),
+                      DropdownMenuItem(value: 'Financeiro', child: Text('Canal: Financeiro')),
+                      DropdownMenuItem(value: 'RH', child: Text('Canal: Recursos Humanos')),
+                      DropdownMenuItem(value: 'Suporte Técnico', child: Text('Canal: Suporte Técnico')),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() => _chatTopic = val);
+                        FirebaseFirestore.instance
+                            .collection('support_chats')
+                            .doc(cleanCPF)
+                            .set({'topic': val}, SetOptions(merge: true));
+                      }
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // Chat body
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.cardBorder),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Column(
+                  children: [
+                    // Stream Builder of messages
+                    Expanded(
+                      child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                        stream: FirebaseFirestore.instance
+                            .collection('support_chats')
+                            .doc(cleanCPF)
+                            .collection('messages')
+                            .orderBy('createdAt')
+                            .snapshots(),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState == ConnectionState.waiting) {
+                            return const Center(child: CircularProgressIndicator(color: AppColors.primaryBlue));
+                          }
+                          final docs = snapshot.data?.docs ?? [];
+                          
+                          if (docs.isEmpty) {
+                            return Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(IconsaxPlusLinear.message_2, size: 48, color: AppColors.textSecondary.withOpacity(0.5)),
+                                  const SizedBox(height: 16),
+                                  const Text('Inicie sua conversa', style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold)),
+                                  const SizedBox(height: 6),
+                                  const Text('Envie uma mensagem para falar com o suporte.', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                                ],
+                              ),
+                            );
+                          }
+
+                          // Trigger auto scroll to bottom on new messages
+                          WidgetsBinding.instance.addPostFrameCallback((_) => _scrollChatToBottom());
+
+                          return ListView.builder(
+                            controller: _chatScrollController,
+                            padding: const EdgeInsets.all(20),
+                            itemCount: docs.length,
+                            itemBuilder: (context, index) {
+                              final data = docs[index].data();
+                              final role = data['senderRole'] ?? '';
+                              final text = data['text'] ?? '';
+                              final isMe = role == 'promoter';
+                              final senderName = data['senderName'] ?? 'Suporte';
+                              final timeStr = _formatMessageTime(data['createdAt']);
+
+                              return Align(
+                                alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                                child: Container(
+                                  margin: const EdgeInsets.symmetric(vertical: 4),
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  constraints: BoxConstraints(
+                                    maxWidth: MediaQuery.of(context).size.width * 0.6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isMe ? AppColors.primaryBlue : AppColors.background,
+                                    borderRadius: BorderRadius.only(
+                                      topLeft: const Radius.circular(16),
+                                      topRight: const Radius.circular(16),
+                                      bottomLeft: Radius.circular(isMe ? 16 : 4),
+                                      bottomRight: Radius.circular(isMe ? 4 : 16),
+                                    ),
+                                    border: isMe ? null : Border.all(color: AppColors.cardBorder),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                    children: [
+                                      if (!isMe)
+                                        Text(
+                                          senderName,
+                                          style: const TextStyle(color: AppColors.primaryBlue, fontWeight: FontWeight.bold, fontSize: 11),
+                                        ),
+                                      if (!isMe) const SizedBox(height: 4),
+                                      Text(
+                                        text,
+                                        style: TextStyle(
+                                          color: isMe ? Colors.white : AppColors.textPrimary,
+                                          fontSize: 14,
+                                          height: 1.4,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        timeStr,
+                                        style: TextStyle(
+                                          color: isMe ? Colors.white70 : AppColors.textSecondary,
+                                          fontSize: 10,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                    
+                    // Composer bar
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: const BoxDecoration(
+                        color: AppColors.surface,
+                        border: Border(top: BorderSide(color: AppColors.cardBorder)),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: AppColors.background,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: AppColors.cardBorder),
+                              ),
+                              child: TextField(
+                                controller: _chatMessageController,
+                                style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+                                textInputAction: TextInputAction.send,
+                                onSubmitted: (_) => _sendChatMessage(),
+                                decoration: const InputDecoration(
+                                  hintText: 'Digite sua mensagem...',
+                                  hintStyle: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+                                  border: InputBorder.none,
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          ElevatedButton(
+                            onPressed: _sendChatMessage,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primaryBlue,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.all(16),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              elevation: 0,
+                            ),
+                            child: const Icon(IconsaxPlusBold.send_1, size: 20),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _sendChatMessage() async {
+    final text = _chatMessageController.text.trim();
+    if (text.isEmpty) return;
+    _chatMessageController.clear();
+    
+    final cleanCPF = _userCpf.replaceAll(RegExp(r'\D'), '');
+    final now = DateTime.now().toIso8601String();
+    
+    try {
+      await FirebaseFirestore.instance
+          .collection('support_chats')
+          .doc(cleanCPF)
+          .collection('messages')
+          .add({
+        'senderId': cleanCPF,
+        'senderName': _userName,
+        'senderRole': 'promoter',
+        'text': text,
+        'createdAt': now,
+        'read': false,
+      });
+      
+      await FirebaseFirestore.instance
+          .collection('support_chats')
+          .doc(cleanCPF)
+          .set({
+        'id': cleanCPF,
+        'promoterCpf': cleanCPF,
+        'promoterName': _userName,
+        'topic': _chatTopic,
+        'lastMessage': text,
+        'lastMessageTime': now,
+        'lastSenderRole': 'promoter',
+        'unreadCountAdmin': FieldValue.increment(1),
+        'unreadCountPromoter': 0,
+        'updatedAt': now,
+      }, SetOptions(merge: true));
+      
+      _scrollChatToBottom();
+    } catch (e) {
+      print('Erro ao enviar mensagem: $e');
+    }
+  }
+
+  void _scrollChatToBottom() {
+    Future.delayed(const Duration(milliseconds: 200), () {
+      if (_chatScrollController.hasClients) {
+        _chatScrollController.animateTo(
+          _chatScrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  String _formatMessageTime(String? isoString) {
+    if (isoString == null || isoString.isEmpty) return '';
+    try {
+      final dateTime = DateTime.parse(isoString);
+      final hour = dateTime.hour.toString().padLeft(2, '0');
+      final minute = dateTime.minute.toString().padLeft(2, '0');
+      return '$hour:$minute';
+    } catch (_) {
+      return '';
+    }
   }
 }
