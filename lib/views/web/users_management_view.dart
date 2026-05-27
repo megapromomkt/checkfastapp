@@ -36,6 +36,11 @@ class _UsersManagementViewState extends State<UsersManagementView> {
   AppUser? _editingUser;
   bool _trainingCompleted = false;
   bool _atacadaoExperience = false;
+  bool _isBlocked = false;
+  final _blockJustificationCtrl = TextEditingController();
+  final _occurrenceDescCtrl = TextEditingController();
+  final _occurrenceStoreCtrl = TextEditingController();
+  String _occurrenceSeverity = 'Leve';
 
   @override
   void initState() {
@@ -126,6 +131,9 @@ class _UsersManagementViewState extends State<UsersManagementView> {
                 _passwordCtrl.text = '123456';
                 _trainingCompleted = false;
                 _atacadaoExperience = false;
+                _isBlocked = false;
+                _blockJustificationCtrl.clear();
+                _currentFormTab = 0;
                 _showingForm = true;
               }),
               icon: const Icon(IconsaxPlusLinear.add, color: Colors.white, size: 18),
@@ -274,6 +282,9 @@ class _UsersManagementViewState extends State<UsersManagementView> {
                             _passwordCtrl.text = user.password;
                             _trainingCompleted = user.trainingCompleted;
                             _atacadaoExperience = user.atacadaoExperience;
+                            _isBlocked = user.isBlocked;
+                            _blockJustificationCtrl.clear();
+                            _currentFormTab = 0;
                             _showingForm = true;
                           });
                         },
@@ -334,6 +345,8 @@ class _UsersManagementViewState extends State<UsersManagementView> {
                 _buildFormTab(1, 'Dados pessoais'),
                 _buildFormTab(2, 'Endereço'),
                 _buildFormTab(3, 'Documentos'),
+                if (_editingUser != null && _currentListTab == 0)
+                  _buildFormTab(4, 'Ocorrências'),
               ],
             ),
           ),
@@ -385,6 +398,7 @@ class _UsersManagementViewState extends State<UsersManagementView> {
                       userToSave.regional = _cargoCtrl.text == 'Regional' ? _regionalCtrl2.text : '';
                       userToSave.trainingCompleted = _trainingCompleted;
                       userToSave.atacadaoExperience = _atacadaoExperience;
+                      userToSave.isBlocked = _isBlocked;
                     } else {
                       userToSave = AppUser(
                         id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -398,7 +412,19 @@ class _UsersManagementViewState extends State<UsersManagementView> {
                         regional: _cargoCtrl.text == 'Regional' ? _regionalCtrl2.text : '',
                         trainingCompleted: _trainingCompleted,
                         atacadaoExperience: _atacadaoExperience,
+                        isBlocked: _isBlocked,
                       );
+                    }
+
+                    if (_isBlocked && _blockJustificationCtrl.text.isNotEmpty) {
+                      final nowFormatted = DateFormat("dd/MM/yyyy HH:mm").format(DateTime.now());
+                      await FirebaseFirestore.instance.collection('occurrences').add({
+                        'promoterCpf': userToSave.id,
+                        'description': 'Bloqueio: ${_blockJustificationCtrl.text}',
+                        'storeName': 'Geral',
+                        'severity': 'Grave',
+                        'date': nowFormatted,
+                      });
                     }
                     
                     await _api.saveUser(userToSave);
@@ -449,6 +475,27 @@ class _UsersManagementViewState extends State<UsersManagementView> {
       case 1: return _buildPersonalDataTab();
       case 2: return _buildAddressTab();
       case 3: return _buildDocumentsTab();
+      case 4: 
+        if (_editingUser != null) {
+          final tempFeedbackCtrl = TextEditingController();
+          final Map<String, dynamic> cv = _editingUser!.curriculumCompletoDados != null && _editingUser!.curriculumCompletoDados!.isNotEmpty
+              ? jsonDecode(_editingUser!.curriculumCompletoDados!)
+              : {};
+          tempFeedbackCtrl.text = cv['rh_feedback'] ?? '';
+          return SizedBox(
+            height: 450,
+            child: _buildHistoryOcorrenciasTab(
+              _editingUser!,
+              tempFeedbackCtrl,
+              _occurrenceDescCtrl,
+              _occurrenceStoreCtrl,
+              _occurrenceSeverity,
+              (val) => setState(() => _occurrenceSeverity = val),
+              () => setState(() {}),
+            ),
+          );
+        }
+        return const SizedBox();
       default: return const SizedBox();
     }
   }
@@ -569,8 +616,28 @@ class _UsersManagementViewState extends State<UsersManagementView> {
                   },
                 ),
               ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _buildDropdownField(
+                  'Bloqueado?',
+                  ['Sim', 'Não'],
+                  value: _isBlocked ? 'Sim' : 'Não',
+                  onChanged: (val) {
+                    setState(() {
+                      _isBlocked = val == 'Sim';
+                    });
+                  },
+                ),
+              ),
             ],
           ),
+          if (_isBlocked) ...[
+            const SizedBox(height: 16),
+            _buildTextField(
+              'Justificativa do Bloqueio',
+              controller: _blockJustificationCtrl,
+            ),
+          ],
         ],
       ],
     );

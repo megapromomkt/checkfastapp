@@ -42,6 +42,7 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
   List<AppDemand> _realDemands = [];
   bool _isLoadingDemands = true;
   Map<String, String> _appliedDemandStatuses = {};
+  bool _isBlocked = false;
 
   int _opportunityCount = 12;
   
@@ -498,6 +499,9 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
             if (fields['pixKey'] != null) {
               _chavePixController.text = fields['pixKey']['stringValue'] ?? '';
             }
+            if (fields['isBlocked'] != null) {
+              _isBlocked = fields['isBlocked']['booleanValue'] ?? false;
+            }
             if (fields['phone'] != null && _whatsappController.text.isEmpty) {
               _whatsappController.text = fields['phone']['stringValue'] ?? '';
             }
@@ -769,6 +773,15 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
   }
 
   void _updateOpportunityCount() async {
+    if (_isBlocked) {
+      setState(() {
+        _realDemands = [];
+        _opportunityCount = 0;
+        _appliedDemandStatuses = {};
+        _isLoadingDemands = false;
+      });
+      return;
+    }
     try {
       final demands = await _api.getDemands();
       final List<AppDemand> filtered = [];

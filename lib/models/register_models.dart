@@ -1049,6 +1049,7 @@ class AppUser {
   String? addressCep;
   bool trainingCompleted;
   bool atacadaoExperience;
+  bool isBlocked;
 
   AppUser({
     required this.id,
@@ -1074,6 +1075,7 @@ class AppUser {
     this.addressCep,
     this.trainingCompleted = false,
     this.atacadaoExperience = false,
+    this.isBlocked = false,
   });
 
   Map<String, dynamic> toMap() {
@@ -1101,6 +1103,7 @@ class AppUser {
       'address_cep': addressCep,
       'trainingCompleted': trainingCompleted,
       'atacadaoExperience': atacadaoExperience,
+      'isBlocked': isBlocked,
     };
   }
 
@@ -1129,6 +1132,7 @@ class AppUser {
       addressCep: map['address_cep'] ?? map['cep'],
       trainingCompleted: map['trainingCompleted'] ?? map['training_completed'] ?? false,
       atacadaoExperience: map['atacadaoExperience'] ?? map['atacadao_experience'] ?? false,
+      isBlocked: map['isBlocked'] ?? map['is_blocked'] ?? false,
     );
   }
 }
