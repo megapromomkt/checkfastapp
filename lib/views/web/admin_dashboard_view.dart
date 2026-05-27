@@ -70,6 +70,45 @@ class AdminDashboardViewState extends State<AdminDashboardView> {
     _listenToPermissions();
   }
 
+  void _setFallbackPermissions(String role) {
+    final Map<String, Map<String, bool>> parsed = {};
+    final lowerRole = role.toLowerCase();
+    
+    if (lowerRole.contains('suporte')) {
+      parsed['Mensagens'] = {'visualizar': true, 'criar': true, 'editar': true, 'excluir': true};
+      parsed['Mensagens - Suporte Técnico'] = {'visualizar': true, 'criar': true, 'editar': true, 'excluir': true};
+      parsed['Mensagens - Operacional'] = {'visualizar': true, 'criar': true, 'editar': true, 'excluir': true};
+      parsed['Currículos'] = {'visualizar': true, 'criar': false, 'editar': false, 'excluir': false};
+      parsed['Cadastros'] = {'visualizar': true, 'criar': false, 'editar': false, 'excluir': false};
+      parsed['Usuários'] = {'visualizar': true, 'criar': false, 'editar': false, 'excluir': false};
+      parsed['Demandas'] = {'visualizar': true, 'criar': false, 'editar': false, 'excluir': false};
+      parsed['Presença'] = {'visualizar': true, 'criar': false, 'editar': false, 'excluir': false};
+      parsed['Relatórios'] = {'visualizar': true, 'criar': false, 'editar': false, 'excluir': false};
+    } else if (lowerRole.contains('rh') || lowerRole.contains('recursos')) {
+      parsed['Currículos'] = {'visualizar': true, 'criar': true, 'editar': true, 'excluir': true};
+      parsed['Mensagens'] = {'visualizar': true, 'criar': true, 'editar': true, 'excluir': true};
+      parsed['Mensagens - RH'] = {'visualizar': true, 'criar': true, 'editar': true, 'excluir': true};
+      parsed['Cadastros'] = {'visualizar': true, 'criar': true, 'editar': true, 'excluir': false};
+      parsed['Demandas'] = {'visualizar': true, 'criar': true, 'editar': true, 'excluir': false};
+      parsed['Relatórios'] = {'visualizar': true, 'criar': true, 'editar': false, 'excluir': false};
+    } else if (lowerRole.contains('financeiro')) {
+      parsed['Financeiro'] = {'visualizar': true, 'criar': true, 'editar': true, 'excluir': true};
+      parsed['Relatórios'] = {'visualizar': true, 'criar': true, 'editar': false, 'excluir': false};
+      parsed['Mensagens'] = {'visualizar': true, 'criar': true, 'editar': true, 'excluir': true};
+      parsed['Mensagens - Financeiro'] = {'visualizar': true, 'criar': true, 'editar': true, 'excluir': true};
+    } else if (lowerRole.contains('trade')) {
+      parsed['Demandas'] = {'visualizar': true, 'criar': true, 'editar': true, 'excluir': true};
+      parsed['Mensagens'] = {'visualizar': true, 'criar': true, 'editar': true, 'excluir': true};
+      parsed['Mensagens - Operacional'] = {'visualizar': true, 'criar': true, 'editar': true, 'excluir': true};
+    }
+    
+    setState(() {
+      _rolePermissions = parsed;
+      _permissionsLoaded = true;
+    });
+    _ensureSelectedTabAllowed();
+  }
+
   void _listenToPermissions() {
     _permissionsSubscription?.cancel();
     final role = _userRole;
@@ -106,12 +145,14 @@ class AdminDashboardViewState extends State<AdminDashboardView> {
             });
             _ensureSelectedTabAllowed();
           }
+        } else {
+          if (mounted) {
+            _setFallbackPermissions(role);
+          }
         }
       } else {
         if (mounted) {
-          setState(() {
-            _permissionsLoaded = true;
-          });
+          _setFallbackPermissions(role);
         }
       }
     });
