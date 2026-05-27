@@ -58,8 +58,16 @@ class AuthModals {
                     password: passwordController.text,
                   );
                 } catch (authError) {
-                  // Se falhar, faremos a Lazy Migration via Firestore SDK (sem quota REST)
-                  print('Auth falhou, tentando migração: $authError');
+                  // Se falhar com a senha normal, tenta com o hash da senha (caso tenha sido criado com o hash no Auth)
+                  try {
+                    final hashed = SecurityService.hashPassword(passwordController.text);
+                    credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+                      email: email,
+                      password: hashed,
+                    );
+                  } catch (authError2) {
+                    print('Auth falhou com senha normal e hash, tentando migração: $authError2');
+                  }
                 }
 
                 String? idToken;

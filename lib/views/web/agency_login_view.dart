@@ -54,7 +54,16 @@ class _AgencyLoginViewState extends State<AgencyLoginView> {
           password: password,
         );
       } catch (authError) {
-        print("Auth falhou, tentando migração: $authError");
+        // Se falhar com a senha normal, tenta com o hash da senha (caso tenha sido criado com o hash no Auth)
+        try {
+          final hashed = SecurityService.hashPassword(password);
+          credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+            email: email,
+            password: hashed,
+          );
+        } catch (authError2) {
+          print("Auth falhou com senha normal e hash, tentando migração: $authError2");
+        }
       }
 
       AppUser? user;
