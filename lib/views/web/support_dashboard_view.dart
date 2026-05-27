@@ -37,7 +37,7 @@ class _SupportDashboardViewState extends State<SupportDashboardView> {
   String? _selectedTopic;
   String? _selectedChannelId; // canal do chat selecionado (id: financeiro, operacional...)
 
-  String _activeFilter = 'Todos';
+  String _activeFilter = 'Todas';
   String _searchQuery = '';
 
   final TextEditingController _replyController = TextEditingController();
@@ -49,6 +49,10 @@ class _SupportDashboardViewState extends State<SupportDashboardView> {
   // ── Quick replies loaded for the current chat channel ─────────────────────
   List<String> _quickReplies = [];
   bool _isUploadingChatFile = false;
+
+  Map<String, Map<String, bool>> _rolePermissions = {};
+  bool _permissionsLoaded = false;
+  StreamSubscription? _permissionsSubscription;
 
   @override
   void initState() {
@@ -117,6 +121,7 @@ class _SupportDashboardViewState extends State<SupportDashboardView> {
   @override
   void dispose() {
     _messagesSubscription?.cancel();
+    _permissionsSubscription?.cancel();
     _replyController.dispose();
     _searchController.dispose();
     _messagesScrollController.dispose();
@@ -125,10 +130,10 @@ class _SupportDashboardViewState extends State<SupportDashboardView> {
 
   Future<void> _loadUserInfo() async {
     final prefs = await SharedPreferences.getInstance();
-    final role = prefs.getString('admin_user_role') ?? 'Master Access';
-    final name = prefs.getString('admin_user_name') ?? 'Admin Central';
+    final role = prefs.getString('admin_user_role') ?? prefs.getString('user_role') ?? 'Master Access';
+    final name = prefs.getString('admin_user_name') ?? prefs.getString('user_name') ?? 'Admin Central';
 
-    String defaultFilter = 'Todos';
+    String defaultFilter = 'Todas';
     final roleLower = role.toLowerCase();
     if (roleLower.contains('financeiro'))        defaultFilter = 'Financeiro';
     else if (roleLower.contains('operacional') || roleLower.contains('campo')) defaultFilter = 'Operacional';
@@ -141,7 +146,66 @@ class _SupportDashboardViewState extends State<SupportDashboardView> {
         _userName = name;
         _activeFilter = defaultFilter;
       });
+      _listenToPermissions();
     }
+  }
+
+  void _listenToPermissions() {
+    _permissionsSubscription?.cancel();
+    final role = _userRole;
+    if (role == 'Master Access' || role == 'Admin') {
+      setState(() {
+        _permissionsLoaded = true;
+      });
+      return;
+    }
+    _permissionsSubscription = FirebaseFirestore.instance
+        .collection('role_permissions')
+        .doc(role)
+        .snapshots()
+        .listen((doc) {
+      if (doc.exists && doc.data() != null) {
+        final data = doc.data()!;
+        final permsMap = data['permissions'] as Map<String, dynamic>?;
+        if (permsMap != null) {
+          final Map<String, Map<String, bool>> parsed = {};
+          permsMap.forEach((key, val) {
+            if (val is Map) {
+              parsed[key] = {
+                'visualizar': val['visualizar'] == true,
+                'criar': val['criar'] == true,
+                'editar': val['editar'] == true,
+                'excluir': val['excluir'] == true,
+              };
+            }
+          });
+          if (mounted) {
+            setState(() {
+              _rolePermissions = parsed;
+              _permissionsLoaded = true;
+            });
+          }
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _permissionsLoaded = true;
+          });
+        }
+      }
+    });
+  }
+
+  bool _hasPermission(String module, String action) {
+    if (_userRole == 'Master Access' || _userRole == 'Admin') {
+      return true;
+    }
+    if (!_permissionsLoaded) return true;
+    final modPerm = _rolePermissions[module];
+    if (modPerm != null) {
+      return modPerm[action] == true;
+    }
+    return false;
   }
 
   // ── Role / topic access helpers ────────────────────────────────────────────
@@ -153,30 +217,28 @@ class _SupportDashboardViewState extends State<SupportDashboardView> {
       return true;
     }
     final topicLower = (topic ?? '').toLowerCase();
-    if (roleLower.contains('financeiro'))  return topicLower.contains('financeiro');
-    if (roleLower.contains('operacional') || roleLower.contains('campo')) return topicLower.contains('operacional');
-    if (roleLower.contains('rh') || roleLower.contains('recursos') || roleLower.contains('humanos')) {
-      return topicLower.contains('rh') || topicLower.contains('recursos') || topicLower.contains('humanos');
+    if (topicLower.contains('financeiro')) return _hasPermission('Mensagens - Financeiro', 'visualizar');
+    if (topicLower.contains('operacional')) return _hasPermission('Mensagens - Operacional', 'visualizar');
+    if (topicLower.contains('rh') || topicLower.contains('recursos') || topicLower.contains('humanos')) {
+      return _hasPermission('Mensagens - RH', 'visualizar');
     }
-    if (roleLower.contains('suporte') || roleLower.contains('tecnico') || roleLower.contains('técnico')) {
-      return topicLower.contains('suporte') || topicLower.contains('tecnico') || topicLower.contains('técnico');
+    if (topicLower.contains('suporte') || topicLower.contains('tecnico') || topicLower.contains('técnico')) {
+      return _hasPermission('Mensagens - Suporte Técnico', 'visualizar');
     }
-    return true;
+    return false;
   }
 
   List<String> _getAvailableFilters() {
     final roleLower = _userRole.toLowerCase();
     if (roleLower.contains('master') || roleLower.contains('admin') ||
         roleLower.contains('diretor') || roleLower.contains('gerente')) {
-      return ['Todos', 'Financeiro', 'Operacional', 'RH', 'Suporte Técnico', 'Não Lidas'];
+      return ['Todas', 'Não lidas', 'Destacadas', 'Financeiro', 'Operacional', 'RH', 'Suporte Técnico'];
     }
-    List<String> filters = [];
-    if (roleLower.contains('financeiro')) filters.add('Financeiro');
-    else if (roleLower.contains('operacional') || roleLower.contains('campo')) filters.add('Operacional');
-    else if (roleLower.contains('rh') || roleLower.contains('recursos') || roleLower.contains('humanos')) filters.add('RH');
-    else if (roleLower.contains('suporte') || roleLower.contains('tecnico') || roleLower.contains('técnico')) filters.add('Suporte Técnico');
-    else return ['Todos', 'Financeiro', 'Operacional', 'RH', 'Suporte Técnico', 'Não Lidas'];
-    filters.add('Não Lidas');
+    List<String> filters = ['Todas', 'Não lidas', 'Destacadas'];
+    if (_hasPermission('Mensagens - Financeiro', 'visualizar')) filters.add('Financeiro');
+    if (_hasPermission('Mensagens - Operacional', 'visualizar')) filters.add('Operacional');
+    if (_hasPermission('Mensagens - RH', 'visualizar')) filters.add('RH');
+    if (_hasPermission('Mensagens - Suporte Técnico', 'visualizar')) filters.add('Suporte Técnico');
     return filters;
   }
 
@@ -416,6 +478,148 @@ class _SupportDashboardViewState extends State<SupportDashboardView> {
     }
   }
 
+  void _showMigrationDialog() {
+    if (_selectedChatId == null) return;
+    showDialog(
+      context: context,
+      builder: (context) {
+        String selectedSector = _selectedTopic ?? 'Operacional';
+        String selectedOperator = 'Qualquer';
+        
+        final List<String> sectors = ['Financeiro', 'Operacional', 'RH', 'Suporte Técnico'];
+        final List<String> operators = ['Thabata', 'Sandra', 'Isabelly', 'Renato', 'Qualquer'];
+
+        return AlertDialog(
+          backgroundColor: AppColors.surface,
+          surfaceTintColor: Colors.transparent,
+          title: const Row(
+            children: [
+              Icon(IconsaxPlusLinear.arrow_swap_horizontal, color: AppColors.primaryBlue),
+              SizedBox(width: 8),
+              Text('Migrar Conversa', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+            ],
+          ),
+          content: StatefulBuilder(
+            builder: (context, setStateDialog) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Selecione o setor para o qual deseja migrar a conversa:', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.background,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.cardBorder),
+                    ),
+                    child: DropdownButton<String>(
+                      value: selectedSector,
+                      underline: const SizedBox(),
+                      isExpanded: true,
+                      onChanged: (val) {
+                        if (val != null) {
+                          setStateDialog(() {
+                            selectedSector = val;
+                          });
+                        }
+                      },
+                      items: sectors.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Selecione o operador responsável:', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.background,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.cardBorder),
+                    ),
+                    child: DropdownButton<String>(
+                      value: selectedOperator,
+                      underline: const SizedBox(),
+                      isExpanded: true,
+                      onChanged: (val) {
+                        if (val != null) {
+                          setStateDialog(() {
+                            selectedOperator = val;
+                          });
+                        }
+                      },
+                      items: operators.map((o) => DropdownMenuItem(value: o, child: Text(o))).toList(),
+                    ),
+                  ),
+                ],
+              );
+            }
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar', style: TextStyle(color: AppColors.textSecondary)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final chatId = _selectedChatId!;
+                final now = DateTime.now().toIso8601String();
+                
+                try {
+                  // 1. Add system message in subcollection
+                  await FirebaseFirestore.instance
+                      .collection('support_chats')
+                      .doc(chatId)
+                      .collection('messages')
+                      .add({
+                    'senderId': 'system',
+                    'senderName': 'Sistema',
+                    'senderRole': 'system',
+                    'text': 'Conversa migrada para o setor "$selectedSector" e operador "$selectedOperator" por $_userName.',
+                    'createdAt': now,
+                    'read': true,
+                  });
+
+                  // 2. Update chat topic and assigned operator in parent doc
+                  await FirebaseFirestore.instance
+                      .collection('support_chats')
+                      .doc(chatId)
+                      .update({
+                    'topic': selectedSector,
+                    'assignedOperator': selectedOperator,
+                    'lastMessage': 'Conversa migrada para $selectedSector ($selectedOperator)',
+                    'lastMessageTime': now,
+                    'unreadCountAdmin': 0, // Reset
+                    'updatedAt': now,
+                  });
+                  
+                  if (mounted) {
+                    Navigator.pop(context);
+                    setState(() {
+                      _selectedTopic = selectedSector;
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: const Text('✨ Conversa migrada com sucesso!'), backgroundColor: AppColors.success),
+                    );
+                  }
+                } catch (e) {
+                  print('Erro ao migrar conversa: $e');
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryBlue,
+                foregroundColor: Colors.white,
+                elevation: 0,
+              ),
+              child: const Text('Migrar', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // SETTINGS DIALOG
   // ─────────────────────────────────────────────────────────────────────────
@@ -624,8 +828,10 @@ class _SupportDashboardViewState extends State<SupportDashboardView> {
                   final d = doc.data();
                   final topic = (d['topic'] ?? '').toString();
                   final unreadCount = d['unreadCountAdmin'] ?? 0;
-                  if (_activeFilter == 'Todos') return true;
-                  if (_activeFilter == 'Não Lidas') return unreadCount > 0;
+                  final isStarred = d['starred'] == true;
+                  if (_activeFilter == 'Todas') return true;
+                  if (_activeFilter == 'Não lidas') return unreadCount > 0;
+                  if (_activeFilter == 'Destacadas') return isStarred;
                   final topicLower = topic.toLowerCase();
                   if (_activeFilter == 'Financeiro')    return topicLower.contains('financeiro');
                   if (_activeFilter == 'Operacional')   return topicLower.contains('operacional');
@@ -740,6 +946,8 @@ class _SupportDashboardViewState extends State<SupportDashboardView> {
     else if (topicLower.contains('rh') || topicLower.contains('recursos')) topicColor = Colors.purpleAccent;
     else if (topicLower.contains('suporte') || topicLower.contains('tecnico')) topicColor = Colors.orangeAccent;
 
+    final isStarred = data['starred'] == true;
+
     return InkWell(
       onTap: () => _selectChat(chatId, cpf, name, topic),
       child: Container(
@@ -771,7 +979,26 @@ class _SupportDashboardViewState extends State<SupportDashboardView> {
                         child: Text(name, style: TextStyle(color: AppColors.textPrimary, fontWeight: unreadCount > 0 ? FontWeight.w800 : FontWeight.bold, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
                       ),
                       const SizedBox(width: 8),
-                      Text(timeStr, style: TextStyle(color: unreadCount > 0 ? AppColors.primaryBlue : AppColors.textSecondary, fontSize: 11, fontWeight: unreadCount > 0 ? FontWeight.bold : FontWeight.normal)),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(timeStr, style: TextStyle(color: unreadCount > 0 ? AppColors.primaryBlue : AppColors.textSecondary, fontSize: 11, fontWeight: unreadCount > 0 ? FontWeight.bold : FontWeight.normal)),
+                          const SizedBox(height: 4),
+                          GestureDetector(
+                            onTap: () {
+                              FirebaseFirestore.instance
+                                  .collection('support_chats')
+                                  .doc(chatId)
+                                  .update({'starred': !isStarred});
+                            },
+                            child: Icon(
+                              isStarred ? Icons.star_rounded : Icons.star_outline_rounded,
+                              color: isStarred ? Colors.amber : AppColors.textSecondary.withOpacity(0.3),
+                              size: 18,
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                   const SizedBox(height: 6),
@@ -992,6 +1219,33 @@ class _SupportDashboardViewState extends State<SupportDashboardView> {
                   ],
                 ),
               ),
+              // Star Highlight Button
+              StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                stream: FirebaseFirestore.instance.collection('support_chats').doc(_selectedChatId).snapshots(),
+                builder: (context, snapshot) {
+                  final isStarred = snapshot.data?.data()?['starred'] == true;
+                  return IconButton(
+                    icon: Icon(
+                      isStarred ? Icons.star_rounded : Icons.star_outline_rounded,
+                      color: isStarred ? Colors.amber : AppColors.textSecondary,
+                    ),
+                    onPressed: () {
+                      FirebaseFirestore.instance
+                          .collection('support_chats')
+                          .doc(_selectedChatId!)
+                          .update({'starred': !isStarred});
+                    },
+                    tooltip: 'Destacar Conversa',
+                  );
+                }
+              ),
+              const SizedBox(width: 8),
+              // Migrate Button
+              IconButton(
+                icon: const Icon(IconsaxPlusLinear.arrow_swap_horizontal, color: AppColors.primaryBlue),
+                onPressed: _showMigrationDialog,
+                tooltip: 'Migrar Conversa',
+              ),
             ],
           ),
         ),
@@ -1024,24 +1278,38 @@ class _SupportDashboardViewState extends State<SupportDashboardView> {
                         );
                       }
 
+                      final timeStr = _formatMessageTime(m['createdAt']);
                       return Align(
                         alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * (isMobile ? 0.7 : 0.45)),
-                          decoration: BoxDecoration(
-                            color: isMe ? AppColors.primaryBlue : Colors.white,
-                            borderRadius: BorderRadius.only(
-                              topLeft: const Radius.circular(16),
-                              topRight: const Radius.circular(16),
-                              bottomLeft: Radius.circular(isMe ? 16 : 0),
-                              bottomRight: Radius.circular(isMe ? 0 : 16),
+                        child: Column(
+                          crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              margin: const EdgeInsets.only(bottom: 4),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * (isMobile ? 0.7 : 0.45)),
+                              decoration: BoxDecoration(
+                                color: isMe ? AppColors.primaryBlue : Colors.white,
+                                borderRadius: BorderRadius.only(
+                                  topLeft: const Radius.circular(16),
+                                  topRight: const Radius.circular(16),
+                                  bottomLeft: Radius.circular(isMe ? 16 : 0),
+                                  bottomRight: Radius.circular(isMe ? 0 : 16),
+                                ),
+                                border: isMe ? null : Border.all(color: AppColors.cardBorder),
+                                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.01), blurRadius: 4, offset: const Offset(0, 2))],
+                              ),
+                              child: _buildMessageContent(m, isMe),
                             ),
-                            border: isMe ? null : Border.all(color: AppColors.cardBorder),
-                            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.01), blurRadius: 4, offset: const Offset(0, 2))],
-                          ),
-                          child: _buildMessageContent(m, isMe),
+                            Padding(
+                              padding: EdgeInsets.only(left: isMe ? 0 : 4, right: isMe ? 4 : 0, bottom: 8),
+                              child: Text(
+                                timeStr,
+                                style: const TextStyle(color: AppColors.textSecondary, fontSize: 10, fontWeight: FontWeight.w500),
+                              ),
+                            ),
+                          ],
                         ),
                       );
                     },

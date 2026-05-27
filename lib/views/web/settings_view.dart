@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/constants/premium_theme.dart';
 
 class SettingsView extends StatefulWidget {
@@ -12,14 +13,114 @@ class SettingsView extends StatefulWidget {
 class _SettingsViewState extends State<SettingsView> {
   String? _selectedProfile;
   int _currentTab = 0;
+  bool _saving = false;
   
-  // Permission state (Mock)
-  final Map<String, Map<String, bool>> _permissions = {
-    'Cadastros': {'visualizar': true, 'criar': false, 'editar': false, 'excluir': false},
-    'Demandas': {'visualizar': true, 'criar': true, 'editar': false, 'excluir': false},
-    'Usuários': {'visualizar': false, 'criar': false, 'editar': false, 'excluir': false},
-    'Financeiro': {'visualizar': false, 'criar': false, 'editar': false, 'excluir': false},
-  };
+  final List<String> _allModules = [
+    'Liquidez BI',
+    'Cadastros',
+    'Usuários',
+    'Demandas',
+    'Currículos',
+    'Presença',
+    'Financeiro',
+    'Relatórios',
+    'Mensagens',
+    'Mensagens - Financeiro',
+    'Mensagens - Operacional',
+    'Mensagens - RH',
+    'Mensagens - Suporte Técnico',
+    'Configurações',
+  ];
+
+  // Permission state (Loaded dynamically)
+  final Map<String, Map<String, bool>> _permissions = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _resetPermissionsToDefault();
+  }
+
+  void _resetPermissionsToDefault() {
+    setState(() {
+      _permissions.clear();
+      for (final m in _allModules) {
+        _permissions[m] = {'visualizar': false, 'criar': false, 'editar': false, 'excluir': false};
+      }
+    });
+  }
+
+  Future<void> _loadPermissionsForProfile(String profile) async {
+    if (profile == 'Admin') {
+      // Admin has universal access
+      setState(() {
+        for (final m in _allModules) {
+          _permissions[m] = {'visualizar': true, 'criar': true, 'editar': true, 'excluir': true};
+        }
+      });
+      return;
+    }
+    
+    try {
+      final doc = await FirebaseFirestore.instance.collection('role_permissions').doc(profile).get();
+      if (doc.exists && doc.data() != null) {
+        final data = doc.data()!;
+        final permsMap = data['permissions'] as Map<String, dynamic>?;
+        if (permsMap != null) {
+          final Map<String, Map<String, bool>> parsed = {};
+          for (final m in _allModules) {
+            final valMap = permsMap[m] as Map?;
+            parsed[m] = {
+              'visualizar': valMap?['visualizar'] == true,
+              'criar': valMap?['criar'] == true,
+              'editar': valMap?['editar'] == true,
+              'excluir': valMap?['excluir'] == true,
+            };
+          }
+          setState(() {
+            _permissions.clear();
+            _permissions.addAll(parsed);
+          });
+          return;
+        }
+      }
+    } catch (e) {
+      print('Erro ao carregar permissões: $e');
+    }
+    _resetPermissionsToDefault();
+  }
+
+  Future<void> _savePermissions() async {
+    if (_selectedProfile == null) return;
+    setState(() => _saving = true);
+    try {
+      await FirebaseFirestore.instance.collection('role_permissions').doc(_selectedProfile).set({
+        'permissions': _permissions,
+        'updatedAt': DateTime.now().toIso8601String(),
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✨ Permissões para o perfil "$_selectedProfile" salvas com sucesso!'),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Erro ao salvar permissões: $e'),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,7 +138,7 @@ class _SettingsViewState extends State<SettingsView> {
           ),
           child: Row(
             children: [
-              _buildTab(0, 'Configurar Usuário'),
+              _buildTab(0, 'Configurar Usuário/Perfil'),
             ],
           ),
         ),
@@ -67,7 +168,6 @@ class _SettingsViewState extends State<SettingsView> {
     );
   }
 
-  // --- ABA 1: CONFIGURAR USUÁRIO ---
   Widget _buildUserConfig() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -87,9 +187,14 @@ class _SettingsViewState extends State<SettingsView> {
             hint: const Text('Selecione...'),
             underline: const SizedBox(),
             isExpanded: true,
-            onChanged: (val) => setState(() => _selectedProfile = val),
+            onChanged: (val) {
+              if (val != null) {
+                setState(() => _selectedProfile = val);
+                _loadPermissionsForProfile(val);
+              }
+            },
             items: const [
-              DropdownMenuItem(value: 'Admin', child: Text('Admin')),
+              DropdownMenuItem(value: 'Admin', child: Text('Admin (Acesso Total)')),
               DropdownMenuItem(value: 'Suporte', child: Text('Suporte')),
               DropdownMenuItem(value: 'Financeiro', child: Text('Financeiro')),
               DropdownMenuItem(value: 'RH', child: Text('RH')),
@@ -113,7 +218,7 @@ class _SettingsViewState extends State<SettingsView> {
           ),
           child: Table(
             columnWidths: const {
-              0: FlexColumnWidth(2),
+              0: FlexColumnWidth(2.5),
               1: FlexColumnWidth(1),
               2: FlexColumnWidth(1),
               3: FlexColumnWidth(1),
@@ -136,16 +241,24 @@ class _SettingsViewState extends State<SettingsView> {
               ..._permissions.entries.map((entry) {
                 final module = entry.key;
                 final perms = entry.value;
+                final isSubChat = module.startsWith('Mensagens -');
                 return TableRow(
                   children: [
                     Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Text(module, style: const TextStyle(fontWeight: FontWeight.bold)),
+                      padding: EdgeInsets.only(left: isSubChat ? 32.0 : 16.0, top: 16.0, bottom: 16.0, right: 16.0),
+                      child: Text(
+                        module,
+                        style: TextStyle(
+                          fontWeight: isSubChat ? FontWeight.normal : FontWeight.bold,
+                          color: isSubChat ? AppColors.textSecondary : AppColors.textPrimary,
+                          fontSize: isSubChat ? 13 : 14,
+                        ),
+                      ),
                     ),
                     _buildCheckboxCell(module, 'visualizar', perms['visualizar']!),
-                    _buildCheckboxCell(module, 'criar', perms['criar']!),
-                    _buildCheckboxCell(module, 'editar', perms['editar']!),
-                    _buildCheckboxCell(module, 'excluir', perms['excluir']!),
+                    isSubChat ? const SizedBox.shrink() : _buildCheckboxCell(module, 'criar', perms['criar']!),
+                    isSubChat ? const SizedBox.shrink() : _buildCheckboxCell(module, 'editar', perms['editar']!),
+                    isSubChat ? const SizedBox.shrink() : _buildCheckboxCell(module, 'excluir', perms['excluir']!),
                   ],
                 );
               }).toList(),
@@ -157,14 +270,19 @@ class _SettingsViewState extends State<SettingsView> {
         // Botão Salvar
         Align(
           alignment: Alignment.centerRight,
-          child: ElevatedButton(
-            onPressed: () {},
+          child: ElevatedButton.icon(
+            onPressed: (_selectedProfile == null || _saving) ? null : _savePermissions,
+            icon: _saving
+                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : const Icon(Icons.save_rounded, size: 18),
+            label: Text(_saving ? 'Salvando...' : 'Salvar Permissões'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primaryBlue,
-              padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              elevation: 0,
             ),
-            child: const Text('Salvar Permissões', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ),
       ],
@@ -179,48 +297,24 @@ class _SettingsViewState extends State<SettingsView> {
   }
 
   Widget _buildCheckboxCell(String module, String action, bool value) {
+    // Disable checkbox editing for Admin profile because Admin always has full access
+    final isEditable = _selectedProfile != 'Admin' && _selectedProfile != null;
     return TableCell(
       verticalAlignment: TableCellVerticalAlignment.middle,
       child: Checkbox(
         value: value,
         activeColor: AppColors.primaryBlue,
-        onChanged: (val) {
+        onChanged: isEditable ? (val) {
           setState(() {
             _permissions[module]![action] = val ?? false;
+            
+            // If checking any sub-chat topic visualization, implicitly check main Mensagens visualization!
+            if (module.startsWith('Mensagens -') && action == 'visualizar' && val == true) {
+              _permissions['Mensagens']!['visualizar'] = true;
+            }
           });
-        },
+        } : null,
       ),
-    );
-  }
-
-
-  Widget _buildSwitchTile(String title, bool value) {
-    return ListTile(
-      title: Text(title, style: const TextStyle(fontSize: 14)),
-      trailing: Switch(
-        value: value,
-        activeColor: AppColors.primaryBlue,
-        onChanged: (val) {},
-      ),
-    );
-  }
-
-  Widget _buildTextField(String label, String initialValue) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label.toUpperCase(), style: const TextStyle(color: AppColors.primaryBlue, fontSize: 12, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        TextField(
-          controller: TextEditingController(text: initialValue),
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: Colors.grey[100],
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(4), borderSide: BorderSide.none),
-            contentPadding: const EdgeInsets.all(12),
-          ),
-        ),
-      ],
     );
   }
 }

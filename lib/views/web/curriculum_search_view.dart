@@ -25,6 +25,7 @@ class _CurriculumSearchViewState extends State<CurriculumSearchView> {
   AppDemand? _selectedDemand;
   
   // Custom filter states
+  bool _isFiltersExpanded = true;
   String _searchQuery = '';
   String _filterRole = 'Todos';
   String _filterCity = 'Todas';
@@ -35,6 +36,57 @@ class _CurriculumSearchViewState extends State<CurriculumSearchView> {
   String _filterBrand = '';
   String _filterRede = '';
   late final ScrollController _mainScrollController;
+
+  List<Widget> _buildActiveFilterChips() {
+    final chips = <Widget>[];
+    if (_selectedDemand != null) {
+      chips.add(_buildFilterChip('Vaga: ${_selectedDemand!.role}'));
+    }
+    if (_searchQuery.isNotEmpty) {
+      chips.add(_buildFilterChip('Busca: $_searchQuery'));
+    }
+    if (_filterRole != 'Todos') {
+      chips.add(_buildFilterChip('Função: $_filterRole'));
+    }
+    if (_filterCity != 'Todas') {
+      chips.add(_buildFilterChip('Cidade: $_filterCity'));
+    }
+    if (_filterContract != 'Qualquer') {
+      chips.add(_buildFilterChip('Contrato: $_filterContract'));
+    }
+    if (_filterCnh != 'Todos') {
+      chips.add(_buildFilterChip('CNH: $_filterCnh'));
+    }
+    if (_filterHasVehicle) {
+      chips.add(_buildFilterChip('Veículo próprio'));
+    }
+    if (_minScore > 0.0) {
+      chips.add(_buildFilterChip('Score min: ${_minScore.toStringAsFixed(1)}'));
+    }
+    if (_filterBrand.isNotEmpty) {
+      chips.add(_buildFilterChip('Marca: $_filterBrand'));
+    }
+    if (_filterRede.isNotEmpty) {
+      chips.add(_buildFilterChip('Rede: $_filterRede'));
+    }
+    return chips;
+  }
+
+  Widget _buildFilterChip(String text) {
+    return Container(
+      margin: const EdgeInsets.only(right: 8, bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.primaryBlue.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.primaryBlue.withOpacity(0.2)),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(fontSize: 11, color: AppColors.primaryBlue, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -1061,294 +1113,321 @@ class _CurriculumSearchViewState extends State<CurriculumSearchView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('FILTROS DE BUSCA E MAPEAMENTO', style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.5)),
-                  const SizedBox(height: 20),
-                  
-                  // Row 1: Vaga, Busca, Função
                   Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('SELECIONE A VAGA OPERACIONAL', style: TextStyle(color: AppColors.primaryBlue, fontWeight: FontWeight.bold, fontSize: 11)),
-                            const SizedBox(height: 8),
-                            DropdownButtonFormField<AppDemand>(
-                              value: _selectedDemand,
-                              isExpanded: true,
-                              decoration: InputDecoration(
-                                hintText: 'Selecione uma vaga aberta',
-                                filled: true,
-                                fillColor: AppColors.background,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.cardBorder)),
-                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.cardBorder)),
+                      const Text('FILTROS DE BUSCA E MAPEAMENTO', style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.5)),
+                      IconButton(
+                        icon: Icon(
+                          _isFiltersExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                          color: AppColors.primaryBlue,
+                          size: 22,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _isFiltersExpanded = !_isFiltersExpanded;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                  if (!_isFiltersExpanded) ...[
+                    const SizedBox(height: 8),
+                    Wrap(
+                      children: _buildActiveFilterChips().isEmpty
+                          ? [const Text('Nenhum filtro ativo', style: TextStyle(color: AppColors.textSecondary, fontSize: 11, fontStyle: FontStyle.italic))]
+                          : _buildActiveFilterChips(),
+                    ),
+                  ],
+                  if (_isFiltersExpanded) ...[
+                    const SizedBox(height: 20),
+                    
+                    // Row 1: Vaga, Busca, Função
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('SELECIONE A VAGA OPERACIONAL', style: TextStyle(color: AppColors.primaryBlue, fontWeight: FontWeight.bold, fontSize: 11)),
+                              const SizedBox(height: 8),
+                              DropdownButtonFormField<AppDemand>(
+                                value: _selectedDemand,
+                                isExpanded: true,
+                                decoration: InputDecoration(
+                                  hintText: 'Selecione uma vaga aberta',
+                                  filled: true,
+                                  fillColor: AppColors.background,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.cardBorder)),
+                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.cardBorder)),
+                                ),
+                                items: _activeDemands.map((d) {
+                                  return DropdownMenuItem(
+                                    value: d,
+                                    child: Text(
+                                      '${d.storeName} (${d.role})',
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  );
+                                }).toList(),
+                                onChanged: (val) {
+                                  setState(() {
+                                    _selectedDemand = val;
+                                  });
+                                },
                               ),
-                              items: _activeDemands.map((d) {
-                                return DropdownMenuItem(
-                                  value: d,
-                                  child: Text(
-                                    '${d.storeName} (${d.role})',
-                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                                    overflow: TextOverflow.ellipsis,
+                              if (_selectedDemand != null) ...[
+                                const SizedBox(height: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primaryBlue.withOpacity(0.03),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: AppColors.primaryBlue.withOpacity(0.15)),
                                   ),
-                                );
-                              }).toList(),
-                              onChanged: (val) {
-                                setState(() {
-                                  _selectedDemand = val;
-                                });
-                              },
-                            ),
-                            if (_selectedDemand != null) ...[
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          '🔍 Vaga: ${_selectedDemand!.role} • 🏢 Cliente: ${_selectedDemand!.clientName ?? 'Não informado'} • 📍 Loja: ${_selectedDemand!.storeName} • 📅 Data: ${_selectedDemand!.date}',
+                                          style: const TextStyle(fontSize: 11, color: AppColors.textPrimary, fontWeight: FontWeight.w500),
+                                        ),
+                                      ),
+                                      IconButton(
+                                        constraints: const BoxConstraints(),
+                                        padding: EdgeInsets.zero,
+                                        icon: const Icon(Icons.close, size: 14, color: AppColors.error),
+                                        onPressed: () => setState(() => _selectedDemand = null),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('PESQUISAR POR NOME OU RESUMO', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold, fontSize: 11)),
+                              const SizedBox(height: 8),
+                              TextField(
+                                onChanged: (val) => setState(() => _searchQuery = val),
+                                style: const TextStyle(fontSize: 13),
+                                decoration: InputDecoration(
+                                  hintText: 'Pesquisar por nome ou resumo...',
+                                  prefixIcon: const Icon(IconsaxPlusLinear.search_normal_1, size: 16),
+                                  filled: true,
+                                  fillColor: AppColors.background,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.cardBorder)),
+                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.cardBorder)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('FUNÇÃO PRINCIPAL', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold, fontSize: 11)),
+                              const SizedBox(height: 8),
+                              DropdownButtonFormField<String>(
+                                value: _filterRole,
+                                style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+                                decoration: InputDecoration(
+                                  filled: true,
+                                  fillColor: AppColors.background,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.cardBorder)),
+                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.cardBorder)),
+                                ),
+                                items: ['Todos', 'Promotor', 'Degustador', 'Repositor', 'Supervisor']
+                                    .map((r) => DropdownMenuItem(value: r, child: Text(r, style: const TextStyle(fontSize: 13)))).toList(),
+                                onChanged: (val) => setState(() => _filterRole = val ?? 'Todos'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Row 2: Cidade, CNH, Marca
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('CIDADE', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold, fontSize: 11)),
+                              const SizedBox(height: 8),
+                              DropdownButtonFormField<String>(
+                                value: _filterCity,
+                                style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+                                decoration: InputDecoration(
+                                  filled: true,
+                                  fillColor: AppColors.background,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.cardBorder)),
+                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.cardBorder)),
+                                ),
+                                items: ['Todas', 'São Paulo', 'Guarulhos', 'Osasco', 'Campinas']
+                                    .map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 13)))).toList(),
+                                onChanged: (val) => setState(() => _filterCity = val ?? 'Todas'),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('CATEGORIA DE CNH', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold, fontSize: 11)),
+                              const SizedBox(height: 8),
+                              DropdownButtonFormField<String>(
+                                value: _filterCnh,
+                                style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+                                decoration: InputDecoration(
+                                  filled: true,
+                                  fillColor: AppColors.background,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.cardBorder)),
+                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.cardBorder)),
+                                ),
+                                items: ['Todos', 'A', 'B', 'AB', 'C', 'D']
+                                    .map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 13)))).toList(),
+                                onChanged: (val) => setState(() => _filterCnh = val ?? 'Todos'),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('EXPERIÊNCIA EM MARCA', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold, fontSize: 11)),
+                              const SizedBox(height: 8),
+                              TextField(
+                                onChanged: (val) => setState(() => _filterBrand = val),
+                                style: const TextStyle(fontSize: 13),
+                                decoration: InputDecoration(
+                                  hintText: 'Ex: Nestlé, Coca-Cola...',
+                                  filled: true,
+                                  fillColor: AppColors.background,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.cardBorder)),
+                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.cardBorder)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Row 3: Rede, Veículo, Score
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('EXPERIÊNCIA EM REDE/SUPERMERCADO', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold, fontSize: 11)),
+                              const SizedBox(height: 8),
+                              TextField(
+                                onChanged: (val) => setState(() => _filterRede = val),
+                                style: const TextStyle(fontSize: 13),
+                                decoration: InputDecoration(
+                                  hintText: 'Ex: Atacadão, Assaí...',
+                                  filled: true,
+                                  fillColor: AppColors.background,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.cardBorder)),
+                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.cardBorder)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('VEÍCULO PRÓPRIO', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold, fontSize: 11)),
                               const SizedBox(height: 8),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                height: 48,
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
                                 decoration: BoxDecoration(
-                                  color: AppColors.primaryBlue.withOpacity(0.03),
+                                  color: AppColors.background,
                                   borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: AppColors.primaryBlue.withOpacity(0.15)),
+                                  border: Border.all(color: AppColors.cardBorder),
                                 ),
                                 child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Expanded(
-                                      child: Text(
-                                        '🔍 Vaga: ${_selectedDemand!.role} • 🏢 Cliente: ${_selectedDemand!.clientName ?? 'Não informado'} • 📍 Loja: ${_selectedDemand!.storeName} • 📅 Data: ${_selectedDemand!.date}',
-                                        style: const TextStyle(fontSize: 11, color: AppColors.textPrimary, fontWeight: FontWeight.w500),
-                                      ),
-                                    ),
-                                    IconButton(
-                                      constraints: const BoxConstraints(),
-                                      padding: EdgeInsets.zero,
-                                      icon: const Icon(Icons.close, size: 14, color: AppColors.error),
-                                      onPressed: () => setState(() => _selectedDemand = null),
+                                    const Text('Exigir veículo próprio', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                                    Switch(
+                                      value: _filterHasVehicle,
+                                      onChanged: (val) => setState(() => _filterHasVehicle = val),
+                                      activeColor: AppColors.primaryBlue,
                                     ),
                                   ],
                                 ),
                               ),
                             ],
-                          ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('PESQUISAR POR NOME OU RESUMO', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold, fontSize: 11)),
-                            const SizedBox(height: 8),
-                            TextField(
-                              onChanged: (val) => setState(() => _searchQuery = val),
-                              style: const TextStyle(fontSize: 13),
-                              decoration: InputDecoration(
-                                hintText: 'Pesquisar por nome ou resumo...',
-                                prefixIcon: const Icon(IconsaxPlusLinear.search_normal_1, size: 16),
-                                filled: true,
-                                fillColor: AppColors.background,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.cardBorder)),
-                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.cardBorder)),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('FUNÇÃO PRINCIPAL', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold, fontSize: 11)),
-                            const SizedBox(height: 8),
-                            DropdownButtonFormField<String>(
-                              value: _filterRole,
-                              style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
-                              decoration: InputDecoration(
-                                filled: true,
-                                fillColor: AppColors.background,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.cardBorder)),
-                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.cardBorder)),
-                              ),
-                              items: ['Todos', 'Promotor', 'Degustador', 'Repositor', 'Supervisor']
-                                  .map((r) => DropdownMenuItem(value: r, child: Text(r, style: const TextStyle(fontSize: 13)))).toList(),
-                              onChanged: (val) => setState(() => _filterRole = val ?? 'Todos'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Row 2: Cidade, CNH, Marca
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('CIDADE', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold, fontSize: 11)),
-                            const SizedBox(height: 8),
-                            DropdownButtonFormField<String>(
-                              value: _filterCity,
-                              style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
-                              decoration: InputDecoration(
-                                filled: true,
-                                fillColor: AppColors.background,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.cardBorder)),
-                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.cardBorder)),
-                              ),
-                              items: ['Todas', 'São Paulo', 'Guarulhos', 'Osasco', 'Campinas']
-                                  .map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 13)))).toList(),
-                              onChanged: (val) => setState(() => _filterCity = val ?? 'Todas'),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('CATEGORIA DE CNH', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold, fontSize: 11)),
-                            const SizedBox(height: 8),
-                            DropdownButtonFormField<String>(
-                              value: _filterCnh,
-                              style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
-                              decoration: InputDecoration(
-                                filled: true,
-                                fillColor: AppColors.background,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.cardBorder)),
-                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.cardBorder)),
-                              ),
-                              items: ['Todos', 'A', 'B', 'AB', 'C', 'D']
-                                  .map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 13)))).toList(),
-                              onChanged: (val) => setState(() => _filterCnh = val ?? 'Todos'),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('EXPERIÊNCIA EM MARCA', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold, fontSize: 11)),
-                            const SizedBox(height: 8),
-                            TextField(
-                              onChanged: (val) => setState(() => _filterBrand = val),
-                              style: const TextStyle(fontSize: 13),
-                              decoration: InputDecoration(
-                                hintText: 'Ex: Nestlé, Coca-Cola...',
-                                filled: true,
-                                fillColor: AppColors.background,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.cardBorder)),
-                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.cardBorder)),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Row 3: Rede, Veículo, Score
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('EXPERIÊNCIA EM REDE/SUPERMERCADO', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold, fontSize: 11)),
-                            const SizedBox(height: 8),
-                            TextField(
-                              onChanged: (val) => setState(() => _filterRede = val),
-                              style: const TextStyle(fontSize: 13),
-                              decoration: InputDecoration(
-                                hintText: 'Ex: Atacadão, Assaí...',
-                                filled: true,
-                                fillColor: AppColors.background,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.cardBorder)),
-                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.cardBorder)),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('VEÍCULO PRÓPRIO', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold, fontSize: 11)),
-                            const SizedBox(height: 8),
-                            Container(
-                              height: 48,
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              decoration: BoxDecoration(
-                                color: AppColors.background,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: AppColors.cardBorder),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Text('Exigir veículo próprio', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                                  Switch(
-                                    value: _filterHasVehicle,
-                                    onChanged: (val) => setState(() => _filterHasVehicle = val),
-                                    activeColor: AppColors.primaryBlue,
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('SCORE MÍNIMO DO RH: ${_minScore.toStringAsFixed(1)}', style: const TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold, fontSize: 11)),
+                              const SizedBox(height: 8),
+                              Container(
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: AppColors.background,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: AppColors.cardBorder),
+                                ),
+                                child: SliderTheme(
+                                  data: SliderTheme.of(context).copyWith(
+                                    trackHeight: 3,
+                                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+                                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
                                   ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('SCORE MÍNIMO DO RH: ${_minScore.toStringAsFixed(1)}', style: const TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold, fontSize: 11)),
-                            const SizedBox(height: 8),
-                            Container(
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: AppColors.background,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: AppColors.cardBorder),
-                              ),
-                              child: SliderTheme(
-                                data: SliderTheme.of(context).copyWith(
-                                  trackHeight: 3,
-                                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
-                                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
-                                ),
-                                child: Slider(
-                                  value: _minScore,
-                                  min: 0.0,
-                                  max: 10.0,
-                                  divisions: 10,
-                                  activeColor: AppColors.primaryBlue,
-                                  onChanged: (val) => setState(() => _minScore = val),
+                                  child: Slider(
+                                    value: _minScore,
+                                    min: 0.0,
+                                    max: 10.0,
+                                    divisions: 10,
+                                    activeColor: AppColors.primaryBlue,
+                                    onChanged: (val) => setState(() => _minScore = val),
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),

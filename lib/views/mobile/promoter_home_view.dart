@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'dart:math' as math;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/services.dart';
@@ -32,8 +33,8 @@ class PromoterHomeView extends StatefulWidget {
 
 class _PromoterHomeViewState extends State<PromoterHomeView> {
   int _selectedIndex = 0;
-  String _userName = 'Ricardo Silva';
-  String _userCpf = '123.456.789-00';
+  String _userName = '';
+  String _userCpf = '';
   String _userCity = '';
   String _userBairro = '';
   String _userCep = '';
@@ -72,6 +73,12 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
     _loadUserData();
   }
 
+  @override
+  void dispose() {
+    _autosaveTimer?.cancel();
+    super.dispose();
+  }
+
   double _userLat = 0.0;
   double _userLon = 0.0;
   double _selectedRadius = 10.0;
@@ -90,38 +97,38 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
   // --- NOVAS VARIÁVEIS DO CURRÍCULO COMPLETO ---
   
   // 1. Dados Pessoais
-  final _resumoController = TextEditingController(text: "Promotora de Vendas dedicada, com sólida experiência em merchandising, abastecimento de gôndolas, layout e precificação. Foco em resultados de vendas e manutenção de padrões de qualidade nas lojas.");
-  final _experienciasController = TextEditingController(text: "Promotora de Vendas - Atacadão (1 ano)\n• Reposição e organização de gôndolas\n• Controle de validade (FIFO)\n• Precificação e ativação de material de merchandising.\n\nPromotora de Vendas - Assaí (6 meses)\n• Atendimento ao cliente e suporte no ponto de venda\n• Organização de estoque e contagem de inventário.");
+  final _resumoController = TextEditingController(text: "");
+  final _experienciasController = TextEditingController(text: "");
   final _nomeSocialController = TextEditingController(text: "");
-  final _rgController = TextEditingController(text: "50.123.456-7");
-  final _orgaoEmissorController = TextEditingController(text: "SSP/SP");
-  final _nascimentoController = TextEditingController(text: "27/04/1998");
-  final _idadeController = TextEditingController(text: "28");
+  final _rgController = TextEditingController(text: "");
+  final _orgaoEmissorController = TextEditingController(text: "");
+  final _nascimentoController = TextEditingController(text: "");
+  final _idadeController = TextEditingController(text: "");
   final _sexoController = TextEditingController(text: "Feminino");
   final _estadoCivilController = TextEditingController(text: "Solteira");
   final _nacionalidadeController = TextEditingController(text: "Brasileira");
-  final _naturalidadeController = TextEditingController(text: "São Paulo - SP");
+  final _naturalidadeController = TextEditingController(text: "");
   final _telSecundarioController = TextEditingController(text: "");
-  final _whatsappController = TextEditingController(text: "(11) 93066-6101");
-  final _linkedinController = TextEditingController(text: "linkedin.com/in/thabata-reco");
-  final _instagramController = TextEditingController(text: "@thabata_trade");
+  final _whatsappController = TextEditingController(text: "");
+  final _linkedinController = TextEditingController(text: "");
+  final _instagramController = TextEditingController(text: "");
 
   // 2. Documentação
-  final _cnhController = TextEditingController(text: "12345678901");
-  String _cnhCategoria = "B";
-  final _cnhValidadeController = TextEditingController(text: "12/12/2030");
+  final _cnhController = TextEditingController(text: "");
+  String _cnhCategoria = "Não possui";
+  final _cnhValidadeController = TextEditingController(text: "");
   bool _possuiVeiculoProprio = false;
   String _tipoVeiculo = "Nenhum";
   final _docVeiculoController = TextEditingController(text: "");
   bool _possuiMoto = false;
   bool _possuiCarro = false;
-  bool _possuiMei = true;
+  bool _possuiMei = false;
   bool _possuiCnpj = false;
-  final _pisController = TextEditingController(text: "120.12345.67.8");
-  final _tituloEleitorController = TextEditingController(text: "1234 5678 9012");
+  final _pisController = TextEditingController(text: "");
+  final _tituloEleitorController = TextEditingController(text: "");
   final _reservistaController = TextEditingController(text: "");
-  final _contaBancariaController = TextEditingController(text: "Banco Itaú - Ag: 1234 CC: 56789-0");
-  final _chavePixController = TextEditingController(text: "thabata.reco@gmail.com");
+  final _contaBancariaController = TextEditingController(text: "");
+  final _chavePixController = TextEditingController(text: "");
 
   // 3. Disponibilidade
   String _disponibilidadeHorario = "Período Integral";
@@ -133,7 +140,7 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
   bool _dispPj = true;
   bool _dispFreelancer = true;
   bool _dispImediata = true;
-  final _regiaoAtuacaoController = TextEditingController(text: "Zona Norte e Centro de São Paulo");
+  final _regiaoAtuacaoController = TextEditingController(text: "");
   double _raioDeslocamento = 15.0; // km
   
   final Map<String, bool> _tiposAcoesFlags = {
@@ -152,33 +159,18 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
   };
 
   // 4. Dados Profissionais
-  final _objetivoProfissionalController = TextEditingController(text: "Atuar como promotora de trade marketing em grandes redes de varejo alimentar e farma.");
-  final _cargoAtualController = TextEditingController(text: "Promotora de Vendas Freelancer");
-  final _ultimoCargoController = TextEditingController(text: "Repositora de Supermercado");
-  final _areaAtuacaoController = TextEditingController(text: "Varejo Alimentar / Trade Marketing");
-  final _tempoExperienciaController = TextEditingController(text: "2 anos");
-  final _pretensaoSalarialController = TextEditingController(text: "R\$ 2.200,00");
-  final _ultimoSalarioController = TextEditingController(text: "R\$ 1.800,00");
+  final _objetivoProfissionalController = TextEditingController(text: "");
+  final _cargoAtualController = TextEditingController(text: "");
+  final _ultimoCargoController = TextEditingController(text: "");
+  final _areaAtuacaoController = TextEditingController(text: "");
+  final _tempoExperienciaController = TextEditingController(text: "");
+  final _pretensaoSalarialController = TextEditingController(text: "");
+  final _ultimoSalarioController = TextEditingController(text: "");
   String _tipoContratacaoDesejada = "Freelancer / CLT";
   String _nivelProfissional = "Assistente";
 
   // 5. Experiências Profissionais (Repeatable)
-  List<Map<String, String>> _experienciasLista = [
-    {
-      'empresa': 'Mega Trade Agência',
-      'cargo': 'Promotora de Merchandising',
-      'segmento': 'Alimentar',
-      'dataEntrada': '01/01/2025',
-      'dataSaida': 'Emprego Atual',
-      'isAtual': 'Sim',
-      'tipoContratacao': 'Freelancer',
-      'atividades': 'Reposição de produtos, ativação de material promocional e conquista de pontos extras.',
-      'resultados': 'Aumento de 15% nas vendas da marca nos PDVs atendidos.',
-      'motivoSaida': '',
-      'gestor': 'Renato Souza',
-      'contatoGestor': '(11) 98888-7777',
-    }
-  ];
+  List<Map<String, String>> _experienciasLista = [];
 
   // 6. Experiência em Trade Marketing (Flags)
   final Map<String, bool> _tradeMarketingFlags = {
@@ -236,17 +228,17 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
 
   // 9. Escolaridade Completa
   String _escolaridadeSelecionada = "Ensino Médio Completo";
-  final _cursoController = TextEditingController(text: "Ensino Médio Completo");
-  final _instituicaoController = TextEditingController(text: "Colégio Estadual de São Paulo");
+  final _cursoController = TextEditingController(text: "");
+  final _instituicaoController = TextEditingController(text: "");
   String _escolaridadeStatus = "Completo";
-  final _anoConclusaoController = TextEditingController(text: "2016");
+  final _anoConclusaoController = TextEditingController(text: "");
 
   // 10. Cursos e Certificações
-  final _cursoNomeController = TextEditingController(text: "Técnicas de Merchandising Avançado");
-  final _cursoInstController = TextEditingController(text: "Sebrae SP");
-  final _cursoCargaController = TextEditingController(text: "20 horas");
-  final _cursoConclusaoController = TextEditingController(text: "15/03/2024");
-  bool _certificadoAnexado = true;
+  final _cursoNomeController = TextEditingController(text: "");
+  final _cursoInstController = TextEditingController(text: "");
+  final _cursoCargaController = TextEditingController(text: "");
+  final _cursoConclusaoController = TextEditingController(text: "");
+  bool _certificadoAnexado = false;
 
   // 11. Habilidades
   final Map<String, bool> _habilidadesTecnicas = {
@@ -272,25 +264,22 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
   };
 
   // 12. Idiomas
-  List<Map<String, String>> _idiomasLista = [
-    {'idioma': 'Português', 'nivel': 'Fluente'},
-    {'idioma': 'Espanhol', 'nivel': 'Básico'}
-  ];
+  List<Map<String, String>> _idiomasLista = [];
 
   // 13. Anexos Extra
-  String _attachedFileName = "Curriculo_Thabata_Reco.pdf";
-  String _anexoFotoProfissional = "foto_profissional.jpg";
-  String _anexoCnh = "cnh_thabata.pdf";
-  String _anexoCertificados = "certificado_sebrae.pdf";
-  String _anexoResidencia = "comprovante_luz.pdf";
+  String _attachedFileName = "";
+  String _anexoFotoProfissional = "";
+  String _anexoCnh = "";
+  String _anexoCertificados = "";
+  String _anexoResidencia = "";
   String _anexoPortfolio = "";
-  String _anexoVideo = "apresentacao.mp4";
+  String _anexoVideo = "";
 
   // 14. Avaliação Interna (Fictício para Visualização de Uso da Empresa)
   final double _scoreCandidato = 9.2;
   final String _rankingCandidato = "#3 Regional";
-  final String _avaliacaoRh = "Candidata altamente pontual, comunicativa e proativa. Excelente histórico disciplinar em todas as diárias realizadas na região Norte.";
-  final String _avaliacaoGestor = "Thabata se destaca pela atenção aos detalhes no planograma e FIFO. Perfil recomendado para ativações premium e ações compartilhadas.";
+  final String _avaliacaoRh = "";
+  final String _avaliacaoGestor = "";
   final String _ultimaEntrevista = "10/04/2026";
   final bool _recontratavel = true;
   final bool _blacklist = false;
@@ -339,19 +328,105 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
   bool _isUploadingPdf = false;
   double _uploadProgress = 0.0;
   bool _hasSavedCv = false;
+  
+  // Tab/Jornada Locks
+  bool _isJornadaUnlocked = false;
+  bool _isLoadingJornada = true;
+  bool _showMissingFields = false;
+  Map<String, dynamic>? _activeJornadaApp;
+
+  Timer? _autosaveTimer;
+
+  void _triggerAutosave() {
+    _autosaveTimer?.cancel();
+    _autosaveTimer = Timer(const Duration(seconds: 2), () {
+      _salvarCurriculoSilencioso();
+    });
+  }
+
+  void _salvarCurriculoSilencioso() async {
+    try {
+      final cleanCpf = _userCpf.replaceAll(RegExp(r'\D'), '');
+      if (cleanCpf.isEmpty) return;
+      final url = Uri.parse('https://firestore.googleapis.com/v1/projects/checkfast-28a72/databases/(default)/documents/users/$cleanCpf');
+      await http.patch(
+        Uri.parse('$url?updateMask.fieldPaths=curriculum_resumo&updateMask.fieldPaths=curriculum_experiencias&updateMask.fieldPaths=curriculum_escolaridade&updateMask.fieldPaths=curriculum_attached_pdf&updateMask.fieldPaths=curriculum_completo_dados&updateMask.fieldPaths=pixKey'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'fields': {
+            'curriculum_resumo': {'stringValue': _resumoController.text},
+            'curriculum_experiencias': {'stringValue': _experienciasController.text},
+            'curriculum_escolaridade': {'stringValue': _escolaridadeSelecionada},
+            'curriculum_attached_pdf': {'stringValue': _attachedFileName},
+            'pixKey': {'stringValue': _chavePixController.text},
+            'curriculum_completo_dados': {'stringValue': jsonEncode({
+              'dados_pessoais': {
+                'nome_social': _nomeSocialController.text,
+                'rg': _rgController.text,
+                'orgao_emissor': _orgaoEmissorController.text,
+                'whatsapp': _whatsappController.text,
+                'linkedin': _linkedinController.text,
+                'instagram': _instagramController.text,
+              },
+              'documentacao': {
+                'cnh': _cnhController.text,
+                'cnh_categoria': _cnhCategoria,
+                'veiculo_proprio': _possuiVeiculoProprio,
+                'carro': _possuiCarro,
+                'moto': _possuiMoto,
+                'mei': _possuiMei,
+              },
+              'disponibilidade': {
+                'horarios': _disponibilidadeHorario,
+                'raio': _raioDeslocamento,
+                'imediata': _dispImediata,
+              },
+              'marcas_disponiveis': _marcasDisponiveis,
+              'marcas_selecionadas': _marcasSelecionadas,
+              'dados_profissionais': {
+                'objetivo': _objetivoProfissionalController.text,
+                'cargo_atual': _cargoAtualController.text,
+                'ultimo_cargo': _ultimoCargoController.text,
+                'area_atuacao': _areaAtuacaoController.text,
+                'tempo_experiencia': _tempoExperienciaController.text,
+                'pretensao_salarial': _pretensaoSalarialController.text,
+                'ultimo_salario': _ultimoSalarioController.text,
+                'regiao_atuacao': _regiaoAtuacaoController.text,
+              },
+              'experiencias': _experienciasLista,
+              'idiomas': _idiomasLista,
+              'escolaridade_detalhes': {
+                'curso': _cursoController.text,
+                'instituicao': _instituicaoController.text,
+                'conclusao': _anoConclusaoController.text,
+              },
+              'cursos_certificacoes': {
+                'nome': _cursoNomeController.text,
+                'instituicao': _cursoInstController.text,
+                'carga': _cursoCargaController.text,
+                'conclusao': _cursoConclusaoController.text,
+              },
+            })}
+          }
+        }),
+      );
+    } catch (e) {
+      print('Erro no autosave do CV: $e');
+    }
+  }
 
   void _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _userName = prefs.getString('user_name') ?? 'Ricardo Silva';
-      _userCpf = prefs.getString('user_cpf') ?? '123.456.789-00';
+      _userName = prefs.getString('user_name') ?? '';
+      _userCpf = prefs.getString('user_cpf') ?? '';
       _userCity = prefs.getString('user_city') ?? '';
       _userBairro = prefs.getString('user_bairro') ?? '';
       _userCep = prefs.getString('user_cep') ?? '';
       _userUf = prefs.getString('user_uf') ?? '';
       _userRua = prefs.getString('user_rua') ?? '';
-      _userEmail = prefs.getString('user_email') ?? 'thabata.reco@gmail.com';
-      _userPhone = prefs.getString('user_phone') ?? '(11) 93066-6101';
+      _userEmail = prefs.getString('user_email') ?? '';
+      _userPhone = prefs.getString('user_phone') ?? '';
 
       final dynamicMarcas = prefs.getStringList('marcas_disponiveis');
       if (dynamicMarcas != null) {
@@ -372,6 +447,167 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
       _pagoNoMes = 'R\$ 0,00';
       _emAnalise = 'R\$ 0,00';
     });
+
+    // Pre-preenche o WhatsApp com o telefone cadastrado se estiver vazio
+    if (_whatsappController.text.isEmpty && _userPhone.isNotEmpty) {
+      _whatsappController.text = _userPhone;
+    }
+
+    final cleanCpf = _userCpf.replaceAll(RegExp(r'\D'), '');
+
+    // Buscar perfil do usuário do Firestore para ter as informações reais do currículo
+    try {
+      final url = Uri.parse('https://firestore.googleapis.com/v1/projects/checkfast-28a72/databases/(default)/documents/users/$cleanCpf');
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final fields = data['fields'] as Map<String, dynamic>?;
+        if (fields != null) {
+          setState(() {
+            if (fields['name'] != null) {
+              _userName = fields['name']['stringValue'] ?? _userName;
+            }
+            if (fields['email'] != null) {
+              _userEmail = fields['email']['stringValue'] ?? _userEmail;
+            }
+            if (fields['phone'] != null) {
+              _userPhone = fields['phone']['stringValue'] ?? _userPhone;
+            }
+            if (fields['address_city'] != null) {
+              _userCity = fields['address_city']['stringValue'] ?? _userCity;
+            }
+            if (fields['address_bairro'] != null) {
+              _userBairro = fields['address_bairro']['stringValue'] ?? _userBairro;
+            }
+            if (fields['address_cep'] != null) {
+              _userCep = fields['address_cep']['stringValue'] ?? _userCep;
+            } else if (fields['cep'] != null) {
+              _userCep = fields['cep']['stringValue'] ?? _userCep;
+            }
+            if (fields['address_uf'] != null) {
+              _userUf = fields['address_uf']['stringValue'] ?? _userUf;
+            }
+            if (fields['address_rua'] != null) {
+              _userRua = fields['address_rua']['stringValue'] ?? _userRua;
+            }
+
+            if (fields['birthDate'] != null) {
+              _nascimentoController.text = fields['birthDate']['stringValue'] ?? '';
+            }
+            if (fields['pixKey'] != null) {
+              _chavePixController.text = fields['pixKey']['stringValue'] ?? '';
+            }
+            if (fields['phone'] != null && _whatsappController.text.isEmpty) {
+              _whatsappController.text = fields['phone']['stringValue'] ?? '';
+            }
+            if (fields['bank_name'] != null) {
+              final bankName = fields['bank_name']['stringValue'] ?? '';
+              final bankAgency = fields['bank_agency'] != null ? fields['bank_agency']['stringValue'] ?? '' : '';
+              final bankAccount = fields['bank_account'] != null ? fields['bank_account']['stringValue'] ?? '' : '';
+              final bankDigit = fields['bank_digit'] != null ? fields['bank_digit']['stringValue'] ?? '' : '';
+              if (bankName.isNotEmpty) {
+                _contaBancariaController.text = "$bankName, Ag: $bankAgency, CC: $bankAccount-$bankDigit";
+              }
+            }
+
+            if (fields['curriculum_resumo'] != null) {
+              _resumoController.text = fields['curriculum_resumo']['stringValue'] ?? '';
+            }
+            if (fields['curriculum_experiencias'] != null) {
+              _experienciasController.text = fields['curriculum_experiencias']['stringValue'] ?? '';
+            }
+            if (fields['curriculum_escolaridade'] != null) {
+              _escolaridadeSelecionada = fields['curriculum_escolaridade']['stringValue'] ?? 'Ensino Médio Completo';
+            }
+            if (fields['curriculum_attached_pdf'] != null) {
+              _attachedFileName = fields['curriculum_attached_pdf']['stringValue'] ?? '';
+            }
+            
+            if (fields['curriculum_completo_dados'] != null) {
+              final rawJson = fields['curriculum_completo_dados']['stringValue'] ?? '{}';
+              final Map<String, dynamic> completeData = jsonDecode(rawJson);
+              
+              final personal = completeData['dados_pessoais'] as Map<String, dynamic>?;
+              if (personal != null) {
+                _nomeSocialController.text = personal['nome_social'] ?? '';
+                _rgController.text = personal['rg'] ?? '';
+                _orgaoEmissorController.text = personal['orgao_emissor'] ?? '';
+                if (personal['whatsapp'] != null && personal['whatsapp'].toString().isNotEmpty) {
+                  _whatsappController.text = personal['whatsapp'] ?? '';
+                }
+                _linkedinController.text = personal['linkedin'] ?? '';
+                _instagramController.text = personal['instagram'] ?? '';
+              }
+              
+              final doc = completeData['documentacao'] as Map<String, dynamic>?;
+              if (doc != null) {
+                _cnhController.text = doc['cnh'] ?? '';
+                _cnhCategoria = doc['cnh_categoria'] ?? 'Não possui';
+                _possuiVeiculoProprio = doc['veiculo_proprio'] ?? false;
+                _possuiCarro = doc['carro'] ?? false;
+                _possuiMoto = doc['moto'] ?? false;
+                _possuiMei = doc['mei'] ?? false;
+              }
+              
+              final disp = completeData['disponibilidade'] as Map<String, dynamic>?;
+              if (disp != null) {
+                _disponibilidadeHorario = disp['horarios'] ?? 'Período Integral';
+                _raioDeslocamento = (disp['raio'] ?? 15.0).toDouble();
+                _dispImediata = disp['imediata'] ?? true;
+              }
+              
+              final selectedMarcas = completeData['marcas_selecionadas'] as List<dynamic>?;
+              if (selectedMarcas != null) {
+                _marcasSelecionadas.clear();
+                _marcasSelecionadas.addAll(selectedMarcas.map((e) => e.toString()));
+              }
+
+              final professional = completeData['dados_profissionais'] as Map<String, dynamic>?;
+              if (professional != null) {
+                _objetivoProfissionalController.text = professional['objetivo'] ?? '';
+                _cargoAtualController.text = professional['cargo_atual'] ?? '';
+                _ultimoCargoController.text = professional['ultimo_cargo'] ?? '';
+                _areaAtuacaoController.text = professional['area_atuacao'] ?? '';
+                _tempoExperienciaController.text = professional['tempo_experiencia'] ?? '';
+                _pretensaoSalarialController.text = professional['pretensao_salarial'] ?? '';
+                _ultimoSalarioController.text = professional['ultimo_salario'] ?? '';
+                _regiaoAtuacaoController.text = professional['regiao_atuacao'] ?? '';
+              }
+              
+              final expList = completeData['experiencias'] as List<dynamic>?;
+              if (expList != null) {
+                _experienciasLista = expList.map((e) => Map<String, String>.from(e as Map)).toList();
+              }
+              
+              final langList = completeData['idiomas'] as List<dynamic>?;
+              if (langList != null) {
+                _idiomasLista = langList.map((e) => Map<String, String>.from(e as Map)).toList();
+              }
+              
+              final eduDetail = completeData['escolaridade_detalhes'] as Map<String, dynamic>?;
+              if (eduDetail != null) {
+                _cursoController.text = eduDetail['curso'] ?? '';
+                _instituicaoController.text = eduDetail['instituicao'] ?? '';
+                _anoConclusaoController.text = eduDetail['conclusao'] ?? '';
+              }
+              
+              final certsDetail = completeData['cursos_certificacoes'] as Map<String, dynamic>?;
+              if (certsDetail != null) {
+                _cursoNomeController.text = certsDetail['nome'] ?? '';
+                _cursoInstController.text = certsDetail['instituicao'] ?? '';
+                _cursoCargaController.text = certsDetail['carga'] ?? '';
+                _cursoConclusaoController.text = certsDetail['conclusao'] ?? '';
+              }
+            }
+          });
+        }
+      }
+    } catch (e) {
+      print('Erro ao carregar dados do currículo do Firestore: $e');
+    }
+
+    // Carrega o status de liberação da aba Jornada
+    _loadJornadaLockStatus();
 
     // Carrega imediatamente as demandas usando o filtro textual por cidade (enquanto a geocodificação roda em background)
     _updateOpportunityCount();
@@ -781,6 +1017,12 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
   }
 
   Widget _buildMobileBottomNav() {
+    final isHomeLocked = _isTabLocked(0);
+    final isDiariasLocked = _isTabLocked(1);
+    final isTarefasLocked = _isTabLocked(2);
+    final isJornadaLocked = _isTabLocked(3);
+    final isFinanceiroLocked = _isTabLocked(4);
+
     return Container(
       decoration: const BoxDecoration(
         color: AppColors.surface,
@@ -790,7 +1032,11 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
         currentIndex: _selectedIndex,
         onTap: (index) {
           HapticFeedback.lightImpact();
-          setState(() => _selectedIndex = index);
+          if (_isTabLocked(index)) {
+            _showBlockedTabDialog(index);
+          } else {
+            setState(() => _selectedIndex = index);
+          }
         },
         backgroundColor: AppColors.surface,
         selectedItemColor: AppColors.primaryBlue,
@@ -801,14 +1047,42 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
         unselectedFontSize: 11,
         selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w800),
         unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
-        items: const [
-          BottomNavigationBarItem(icon: Icon(IconsaxPlusLinear.home_2), activeIcon: Icon(IconsaxPlusBold.home_2), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(IconsaxPlusLinear.shop), activeIcon: Icon(IconsaxPlusBold.shop), label: 'Diárias'),
-          BottomNavigationBarItem(icon: Icon(IconsaxPlusLinear.task_square), activeIcon: Icon(IconsaxPlusBold.task_square), label: 'Tarefas'),
-          BottomNavigationBarItem(icon: Icon(IconsaxPlusLinear.location), activeIcon: Icon(IconsaxPlusBold.location), label: 'Check-in'),
-          BottomNavigationBarItem(icon: Icon(IconsaxPlusLinear.wallet_2), activeIcon: Icon(IconsaxPlusBold.wallet_2), label: 'Ganhos'),
-          BottomNavigationBarItem(icon: Icon(IconsaxPlusLinear.document_text), activeIcon: Icon(IconsaxPlusBold.document_text), label: 'Currículo'),
-          BottomNavigationBarItem(icon: Icon(IconsaxPlusLinear.message_2), activeIcon: Icon(IconsaxPlusBold.message_2), label: 'Mensagens'),
+        items: [
+          BottomNavigationBarItem(
+            icon: Icon(isHomeLocked ? IconsaxPlusLinear.lock : IconsaxPlusLinear.home_2), 
+            activeIcon: Icon(isHomeLocked ? IconsaxPlusBold.lock : IconsaxPlusBold.home_2), 
+            label: isHomeLocked ? 'Home 🔒' : 'Home'
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(isDiariasLocked ? IconsaxPlusLinear.lock : IconsaxPlusLinear.shop), 
+            activeIcon: Icon(isDiariasLocked ? IconsaxPlusBold.lock : IconsaxPlusBold.shop), 
+            label: isDiariasLocked ? 'Diárias 🔒' : 'Diárias'
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(isTarefasLocked ? IconsaxPlusLinear.lock : IconsaxPlusLinear.task_square), 
+            activeIcon: Icon(isTarefasLocked ? IconsaxPlusBold.lock : IconsaxPlusBold.task_square), 
+            label: isTarefasLocked ? 'Tarefas 🔒' : 'Tarefas'
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(isJornadaLocked ? IconsaxPlusLinear.lock : IconsaxPlusLinear.location), 
+            activeIcon: Icon(isJornadaLocked ? IconsaxPlusBold.lock : IconsaxPlusBold.location), 
+            label: isJornadaLocked ? 'Jornada 🔒' : 'Check-in'
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(isFinanceiroLocked ? IconsaxPlusLinear.lock : IconsaxPlusLinear.wallet_2), 
+            activeIcon: Icon(isFinanceiroLocked ? IconsaxPlusBold.lock : IconsaxPlusBold.wallet_2), 
+            label: isFinanceiroLocked ? 'Ganhos 🔒' : 'Ganhos'
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(IconsaxPlusLinear.document_text), 
+            activeIcon: Icon(IconsaxPlusBold.document_text), 
+            label: 'Currículo'
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(IconsaxPlusLinear.message_2), 
+            activeIcon: Icon(IconsaxPlusBold.message_2), 
+            label: 'Mensagens'
+          ),
         ],
       ),
     );
@@ -867,10 +1141,20 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
 
   Widget _buildSidebarItem(int index, IconData icon, String label) {
     final isSelected = _selectedIndex == index;
+    final isLocked = _isTabLocked(index);
+    final displayIcon = isLocked ? IconsaxPlusLinear.lock : icon;
+    final displayLabel = isLocked ? '$label 🔒' : label;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
       child: InkWell(
-        onTap: () => setState(() => _selectedIndex = index),
+        onTap: () {
+          if (isLocked) {
+            _showBlockedTabDialog(index);
+          } else {
+            setState(() => _selectedIndex = index);
+          }
+        },
         borderRadius: BorderRadius.circular(8),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -880,9 +1164,9 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
           ),
           child: Row(
             children: [
-              Icon(icon, color: isSelected ? AppColors.primaryBlue : AppColors.textSecondary, size: 22),
+              Icon(displayIcon, color: isSelected ? AppColors.primaryBlue : AppColors.textSecondary, size: 22),
               const SizedBox(width: 16),
-              Text(label, style: TextStyle(
+              Text(displayLabel, style: TextStyle(
                 color: isSelected ? AppColors.primaryBlue : AppColors.textSecondary, 
                 fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600, 
                 fontSize: 14
@@ -1111,7 +1395,13 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
 
   Widget _buildQuickActionCard(IconData icon, String title, String subtitle, Color color, int index) {
     return InkWell(
-      onTap: () => setState(() => _selectedIndex = index),
+      onTap: () {
+        if (_isTabLocked(index)) {
+          _showBlockedTabDialog(index);
+        } else {
+          setState(() => _selectedIndex = index);
+        }
+      },
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.all(20),
@@ -1466,7 +1756,7 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
               final Uri emailLaunchUri = Uri(
                 scheme: 'mailto',
                 path: 'suporte@checkfast.com',
-                queryParameters: {'subject': 'Suporte CheckFast - Ricardo Souza'}
+                queryParameters: {'subject': 'Suporte CheckFast - $_userName'}
               );
               if (await canLaunchUrl(emailLaunchUri)) {
                 await launchUrl(emailLaunchUri);
@@ -1796,11 +2086,22 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
                       children: [
                         Expanded(flex: 3, child: _buildCurriculoFormCard(context, isDesktop)),
                         const SizedBox(width: 30),
-                        Expanded(flex: 2, child: _buildCurriculoPreviewCard()),
+                        Expanded(
+                          flex: 2, 
+                          child: Column(
+                            children: [
+                              _buildCurriculoProgressCard(),
+                              const SizedBox(height: 20),
+                              _buildCurriculoPreviewCard(),
+                            ],
+                          ),
+                        ),
                       ],
                     )
                   : Column(
                       children: [
+                        _buildCurriculoProgressCard(),
+                        const SizedBox(height: 20),
                         _buildCurriculoFormCard(context, isDesktop),
                         const SizedBox(height: 30),
                         _buildCurriculoPreviewCard(),
@@ -1953,6 +2254,7 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
               divisions: 19,
               activeColor: AppColors.primaryBlue,
               onChanged: (val) => setState(() => _raioDeslocamento = val),
+              onChangeEnd: (val) => _triggerAutosave(),
             ),
             const SizedBox(height: 15),
             const Text('Aceita Atuar Em:', style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w700)),
@@ -2012,6 +2314,7 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
                             setState(() {
                               _experienciasLista.removeAt(index);
                             });
+                            _triggerAutosave();
                           },
                         ),
                       ],
@@ -2057,6 +2360,7 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
                       'contatoGestor': '',
                     });
                   });
+                  _triggerAutosave();
                 },
                 icon: const Icon(Icons.add, color: AppColors.primaryBlue),
                 label: const Text('ADICIONAR EXPERIÊNCIA', style: TextStyle(color: AppColors.primaryBlue, fontWeight: FontWeight.w800)),
@@ -2214,6 +2518,7 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
                         setState(() {
                           _idiomasLista.removeAt(index);
                         });
+                        _triggerAutosave();
                       },
                     ),
                   ],
@@ -2225,6 +2530,7 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
                 setState(() {
                   _idiomasLista.add({'idioma': '', 'nivel': 'Básico'});
                 });
+                _triggerAutosave();
               },
               icon: const Icon(Icons.add, color: AppColors.primaryBlue),
               label: const Text('ADICIONAR IDIOMA', style: TextStyle(color: AppColors.primaryBlue, fontWeight: FontWeight.w800)),
@@ -2563,7 +2869,10 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
               enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.cardBorder)),
               focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.primaryBlue)),
             ),
-            onChanged: (val) => setState(() {}),
+            onChanged: (val) {
+              setState(() {});
+              _triggerAutosave();
+            },
           ),
         ],
       ),
@@ -2591,7 +2900,10 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
                 isExpanded: true,
                 dropdownColor: AppColors.surface,
                 style: const TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600),
-                onChanged: onChanged,
+                onChanged: (val) {
+                  onChanged(val);
+                  _triggerAutosave();
+                },
                 items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
               ),
             ),
@@ -2613,7 +2925,10 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
           Switch(
             value: value,
             activeColor: AppColors.primaryBlue,
-            onChanged: onChanged,
+            onChanged: (val) {
+              onChanged(val);
+              _triggerAutosave();
+            },
           ),
         ],
       ),
@@ -2636,6 +2951,7 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
                 setState(() {
                   flags[key] = !isChecked;
                 });
+                _triggerAutosave();
               },
               borderRadius: BorderRadius.circular(8),
               child: Row(
@@ -2647,6 +2963,7 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
                       setState(() {
                         flags[key] = val == true;
                       });
+                      _triggerAutosave();
                     },
                   ),
                   Expanded(
@@ -2683,6 +3000,7 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
             onChanged: (val) {
               item[key] = val;
               setState(() {});
+              _triggerAutosave();
             },
           ),
         ],
@@ -2762,19 +3080,454 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
     );
   }
 
+  // --- MÉTODOS AUXILIARES E WIDGETS DO CÁLCULO E TRAVAS DE CURRÍCULO ---
+
+  Map<String, dynamic> _calculateCurriculumProgress() {
+    double percent = 0.0;
+    final List<String> missing = [];
+
+    // 1. Dados Pessoais (20%)
+    double personalPoints = 0.0;
+    if (_rgController.text.trim().isNotEmpty) {
+      personalPoints += 5.0;
+    } else {
+      missing.add('RG (Dados Pessoais)');
+    }
+    
+    if (_nascimentoController.text.trim().isNotEmpty) {
+      personalPoints += 5.0;
+    } else {
+      missing.add('Data de Nascimento (Dados Pessoais)');
+    }
+    
+    if (_whatsappController.text.trim().isNotEmpty) {
+      personalPoints += 5.0;
+    } else {
+      missing.add('WhatsApp (Dados Pessoais)');
+    }
+    
+    if (_linkedinController.text.trim().isNotEmpty || _instagramController.text.trim().isNotEmpty) {
+      personalPoints += 5.0;
+    } else {
+      missing.add('Rede Social - LinkedIn ou Instagram (Dados Pessoais)');
+    }
+    percent += personalPoints;
+
+    // 2. Endereço (15%)
+    double addressPoints = 0.0;
+    if (_userCep.trim().isNotEmpty) {
+      addressPoints += 7.5;
+    } else {
+      missing.add('CEP Residencial (Dados Pessoais)');
+    }
+    
+    if (_userCity.trim().isNotEmpty && _userUf.trim().isNotEmpty) {
+      addressPoints += 7.5;
+    } else {
+      missing.add('Cidade e Estado (Dados Pessoais)');
+    }
+    percent += addressPoints;
+
+    // 3. Documentação e Financeiro (25%)
+    double docPoints = 0.0;
+    if (_chavePixController.text.trim().isNotEmpty) {
+      docPoints += 7.0;
+    } else {
+      missing.add('Chave PIX (Documentação)');
+    }
+    
+    if (_contaBancariaController.text.trim().isNotEmpty) {
+      docPoints += 6.0;
+    } else {
+      missing.add('Dados da Conta Bancária (Documentação)');
+    }
+    
+    if (_cnhCategoria == 'Não possui') {
+      docPoints += 6.0;
+    } else if (_cnhController.text.trim().isNotEmpty) {
+      docPoints += 6.0;
+    } else {
+      missing.add('Número da CNH (Documentação)');
+    }
+    
+    if (_pisController.text.trim().isNotEmpty || _tituloEleitorController.text.trim().isNotEmpty) {
+      docPoints += 6.0;
+    } else {
+      missing.add('Número do PIS ou Título de Eleitor (Documentação)');
+    }
+    percent += docPoints;
+
+    // 4. Perfil Profissional (20%)
+    double profPoints = 0.0;
+    if (_resumoController.text.trim().length > 10) {
+      profPoints += 7.0;
+    } else {
+      missing.add('Resumo Profissional com pelo menos 10 caracteres (Formulário)');
+    }
+    
+    if (_experienciasLista.isNotEmpty || _experienciasController.text.trim().isNotEmpty) {
+      profPoints += 7.0;
+    } else {
+      missing.add('Experiência Profissional (Formulário)');
+    }
+    
+    if (_escolaridadeSelecionada.isNotEmpty) {
+      profPoints += 6.0;
+    } else {
+      missing.add('Escolaridade (Formulário)');
+    }
+    percent += profPoints;
+
+    // 5. Disponibilidade (10%)
+    double dispPoints = 0.0;
+    if (_disponibilidadeHorario.isNotEmpty) {
+      dispPoints += 5.0;
+    } else {
+      missing.add('Disponibilidade de Horário (Disponibilidade)');
+    }
+    
+    if (_regiaoAtuacaoController.text.trim().isNotEmpty) {
+      dispPoints += 5.0;
+    } else {
+      missing.add('Região de Atuação (Disponibilidade)');
+    }
+    percent += dispPoints;
+
+    // 6. Anexos (10%)
+    double attachPoints = 0.0;
+    if (_attachedFileName.trim().isNotEmpty) {
+      attachPoints += 10.0;
+    } else {
+      missing.add('Anexar Currículo em PDF (Anexos)');
+    }
+    percent += attachPoints;
+
+    if (percent > 100.0) percent = 100.0;
+    if (percent < 0.0) percent = 0.0;
+
+    return {
+      'percent': percent,
+      'missing': missing,
+    };
+  }
+
+  bool _checkJornadaUnlocked(Map<String, dynamic> app) {
+    final status = app['status']?.toString() ?? '';
+    if (status != 'tarefa_aprovada') {
+      // Se a jornada já iniciou ou concluiu, ou está sob análise, libera o acesso para consulta/checkout.
+      return true;
+    }
+    
+    // Se está agendado (tarefa_aprovada), verifica a data e hora de check-in
+    final dateStr = app['date']?.toString() ?? ''; // ex: "2026-05-27"
+    final timeRangeStr = app['timeRange']?.toString() ?? ''; // ex: "08:00 - 12:00"
+    
+    if (dateStr.isEmpty) return false;
+    
+    try {
+      final dateParts = dateStr.split('-');
+      if (dateParts.length != 3) return false;
+      final year = int.parse(dateParts[0]);
+      final month = int.parse(dateParts[1]);
+      final day = int.parse(dateParts[2]);
+      
+      int hour = 8;
+      int minute = 0;
+      if (timeRangeStr.isNotEmpty) {
+        final times = timeRangeStr.split('-');
+        if (times.isNotEmpty) {
+          final startTimeStr = times[0].trim(); // ex: "08:00"
+          final hourMin = startTimeStr.split(':');
+          if (hourMin.length == 2) {
+            hour = int.parse(hourMin[0]);
+            minute = int.parse(hourMin[1]);
+          }
+        }
+      }
+      
+      final checkInDateTime = DateTime(year, month, day, hour, minute);
+      final now = DateTime.now();
+      
+      // Liberada a partir de 3 horas antes do check-in
+      final releaseTime = checkInDateTime.subtract(const Duration(hours: 3));
+      
+      return now.isAfter(releaseTime);
+    } catch (e) {
+      print('Erro ao analisar data/hora de checkin da jornada: $e');
+      return false;
+    }
+  }
+
+  Future<void> _loadJornadaLockStatus() async {
+    if (_userCpf.isEmpty) return;
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('applications')
+          .where('promoterCpf', isEqualTo: _userCpf)
+          .orderBy('submittedAt', descending: true)
+          .get();
+
+      bool unlocked = false;
+      Map<String, dynamic>? active;
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        final status = data['status']?.toString() ?? '';
+        
+        if (status == 'tarefa_aprovada' || 
+            status == 'em_andamento' || 
+            status == 'em_analise' || 
+            status == 'liberado_pagamento' || 
+            status == 'pago' || 
+            status == 'nao_aprovada') {
+          active = {
+            'id': doc.id,
+            'status': status,
+            'date': data['date']?.toString() ?? '',
+            'timeRange': data['timeRange']?.toString() ?? '',
+          };
+          break;
+        }
+      }
+
+      if (active != null) {
+        unlocked = _checkJornadaUnlocked(active);
+      }
+
+      if (mounted) {
+        setState(() {
+          _activeJornadaApp = active;
+          _isJornadaUnlocked = unlocked;
+          _isLoadingJornada = false;
+        });
+      }
+    } catch (e) {
+      print('Erro ao carregar status da jornada: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingJornada = false;
+        });
+      }
+    }
+  }
+
+  bool _isTabLocked(int index) {
+    if (index == 3) {
+      return !_isJornadaUnlocked;
+    }
+    return false;
+  }
+
+  void _showBlockedTabDialog(int index) {
+    String title = "Jornada Bloqueada";
+    String message = "A aba Jornada só é liberada a partir de 3 horas antes do horário programado de check-in no seu dia de trabalho.";
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.redAccent.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(IconsaxPlusBold.lock_1, color: Colors.redAccent, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Text(title, style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w900, fontSize: 18)),
+            ],
+          ),
+          content: Text(
+            message,
+            style: const TextStyle(color: AppColors.textSecondary, fontSize: 14, height: 1.4, fontWeight: FontWeight.w500),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text('OK', style: TextStyle(color: AppColors.primaryBlue, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildCurriculoProgressCard() {
+    final progressData = _calculateCurriculumProgress();
+    final double progress = progressData['percent'];
+    final List<String> missing = List<String>.from(progressData['missing']);
+
+    Color progressColor;
+    String statusTitle;
+    String statusSubtitle;
+
+    if (progress < 60.0) {
+      progressColor = AppColors.warning;
+      statusTitle = "Currículo em Andamento";
+      statusSubtitle = "Complete seu currículo para se destacar e receber diárias premium.";
+    } else if (progress < 85.0) {
+      progressColor = AppColors.primaryBlue;
+      statusTitle = "Perfil Recomendado";
+      statusSubtitle = "Plataforma liberada! Aumente o preenchimento para se destacar.";
+    } else {
+      progressColor = AppColors.success;
+      statusTitle = "Perfil Campeão! 🏆";
+      statusSubtitle = "Você está com o currículo excelente para diárias premium.";
+    }
+
+    return PremiumCard(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      statusTitle,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      statusSubtitle,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: progressColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  "${progress.toInt()}%",
+                  style: TextStyle(
+                    color: progressColor,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: LinearProgressIndicator(
+              value: progress / 100.0,
+              minHeight: 10,
+              backgroundColor: AppColors.background,
+              valueColor: AlwaysStoppedAnimation<Color>(progressColor),
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (missing.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            InkWell(
+              onTap: () {
+                setState(() {
+                  _showMissingFields = !_showMissingFields;
+                });
+              },
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      _showMissingFields ? "Ocultar pendências" : "Ver pendências (${missing.length})",
+                      style: const TextStyle(
+                        color: AppColors.primaryBlue,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Icon(
+                      _showMissingFields ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                      color: AppColors.primaryBlue,
+                      size: 18,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (_showMissingFields)
+              Container(
+                margin: const EdgeInsets.only(top: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.cardBorder),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: missing.map((item) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.circle, size: 6, color: AppColors.textSecondary),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              item,
+                              style: const TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
   void _salvarCurriculoCompleto(BuildContext context) async {
     setState(() => _hasSavedCv = true);
     // Salvar currículo no Firestore
     try {
-      final url = Uri.parse('https://firestore.googleapis.com/v1/projects/checkfast-28a72/databases/(default)/documents/users/$_userCpf');
+      final cleanCpf = _userCpf.replaceAll(RegExp(r'\D'), '');
+      final url = Uri.parse('https://firestore.googleapis.com/v1/projects/checkfast-28a72/databases/(default)/documents/users/$cleanCpf');
       final res = await http.patch(
-        Uri.parse('$url?updateMask.fieldPaths=curriculum_resumo&updateMask.fieldPaths=curriculum_experiencias&updateMask.fieldPaths=curriculum_escolaridade&updateMask.fieldPaths=curriculum_attached_pdf&updateMask.fieldPaths=curriculum_completo_dados'),
+        Uri.parse('$url?updateMask.fieldPaths=curriculum_resumo&updateMask.fieldPaths=curriculum_experiencias&updateMask.fieldPaths=curriculum_escolaridade&updateMask.fieldPaths=curriculum_attached_pdf&updateMask.fieldPaths=curriculum_completo_dados&updateMask.fieldPaths=pixKey'),
         body: jsonEncode({
           'fields': {
             'curriculum_resumo': {'stringValue': _resumoController.text},
             'curriculum_experiencias': {'stringValue': _experienciasController.text},
             'curriculum_escolaridade': {'stringValue': _escolaridadeSelecionada},
             'curriculum_attached_pdf': {'stringValue': _attachedFileName},
+            'pixKey': {'stringValue': _chavePixController.text},
             'curriculum_completo_dados': {'stringValue': jsonEncode({
               'dados_pessoais': {
                 'nome_social': _nomeSocialController.text,
@@ -2799,6 +3552,29 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
               },
               'marcas_disponiveis': _marcasDisponiveis,
               'marcas_selecionadas': _marcasSelecionadas,
+              'dados_profissionais': {
+                'objetivo': _objetivoProfissionalController.text,
+                'cargo_atual': _cargoAtualController.text,
+                'ultimo_cargo': _ultimoCargoController.text,
+                'area_atuacao': _areaAtuacaoController.text,
+                'tempo_experiencia': _tempoExperienciaController.text,
+                'pretensao_salarial': _pretensaoSalarialController.text,
+                'ultimo_salario': _ultimoSalarioController.text,
+                'regiao_atuacao': _regiaoAtuacaoController.text,
+              },
+              'experiencias': _experienciasLista,
+              'idiomas': _idiomasLista,
+              'escolaridade_detalhes': {
+                'curso': _cursoController.text,
+                'instituicao': _instituicaoController.text,
+                'conclusao': _anoConclusaoController.text,
+              },
+              'cursos_certificacoes': {
+                'nome': _cursoNomeController.text,
+                'instituicao': _cursoInstController.text,
+                'carga': _cursoCargaController.text,
+                'conclusao': _cursoConclusaoController.text,
+              },
             })}
           }
         }),

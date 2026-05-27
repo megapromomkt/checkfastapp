@@ -23,6 +23,7 @@ class _UsersManagementViewState extends State<UsersManagementView> {
   final _passwordCtrl = TextEditingController(text: '123456');
   String _selectedStoreId = '';
   final _regionalCtrl2 = TextEditingController();
+  final _searchCtrl = TextEditingController();
 
   final _api = RegisterService();
   bool _loading = true;
@@ -34,6 +35,17 @@ class _UsersManagementViewState extends State<UsersManagementView> {
   void initState() {
     super.initState();
     _loadUsers();
+  }
+
+  @override
+  void dispose() {
+    _nomeCtrl.dispose();
+    _emailCtrl.dispose();
+    _cargoCtrl.dispose();
+    _passwordCtrl.dispose();
+    _regionalCtrl2.dispose();
+    _searchCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _loadUsers() async {
@@ -61,14 +73,18 @@ class _UsersManagementViewState extends State<UsersManagementView> {
   Widget _buildList() {
     if (_loading) return const Center(child: CircularProgressIndicator());
 
+    final query = _searchCtrl.text.toLowerCase().trim();
     final filteredUsers = _users.where((user) {
       final isWorker = user.type == 'prestador' || user.role.toLowerCase() == 'worker';
-      if (_currentListTab == 0) {
-        return isWorker;
-      } else {
-        return !isWorker;
-      }
+      final matchesTab = _currentListTab == 0 ? isWorker : !isWorker;
+      if (!matchesTab) return false;
+      if (query.isEmpty) return true;
+      return user.name.toLowerCase().contains(query) ||
+             user.email.toLowerCase().contains(query) ||
+             user.role.toLowerCase().contains(query);
     }).toList();
+
+    filteredUsers.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
 
     return Column(
@@ -152,6 +168,10 @@ class _UsersManagementViewState extends State<UsersManagementView> {
           children: [
             Expanded(
               child: TextField(
+                controller: _searchCtrl,
+                onChanged: (value) {
+                  setState(() {});
+                },
                 decoration: InputDecoration(
                   hintText: 'Pesquisar',
                   prefixIcon: const Icon(IconsaxPlusLinear.search_normal, color: AppColors.textSecondary),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:ui';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/constants/premium_theme.dart';
 import '../../core/data/test_database.dart';
@@ -36,6 +37,13 @@ class _DemandsManagementViewState extends State<DemandsManagementView> {
   AppDemand? _selectedDemandForVinculo;
   int _vinculoSubTab = 0;
   String _promoterSearchQuery = '';
+  final ScrollController _horizontalDemandScrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _horizontalDemandScrollController.dispose();
+    super.dispose();
+  }
 
   Future<void> _cleanDuplicates(BuildContext context) async {
     // Mostrar loading de análise
@@ -863,81 +871,147 @@ class _DemandsManagementViewState extends State<DemandsManagementView> {
                           ),
                         ),
                       ),
-                    ] else ...[
+                    ] else if (_activeTab == 1) ...[
                       // VÍNCULO & REALOCAÇÃO Tab Layout
-                      // BARRA DE PESQUISA E FILTROS (Vínculo & Realocação)
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: AppColors.cardBorder),
+                      if (_selectedDemandForVinculo != null) ...[
+                        // Dedicated Vinculo Details Screen (3 columns fullscreen-like, hiding search/horizontal list)
+                        Row(
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: () {
+                                setState(() {
+                                  _selectedDemandForVinculo = null;
+                                });
+                              },
+                              icon: const Icon(Icons.arrow_back, color: AppColors.primaryBlue),
+                              label: const Text('VOLTAR PARA LISTA DE LOJAS', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryBlue)),
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: AppColors.primaryBlue),
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               ),
-                              child: TextField(
-                                onChanged: (val) => setState(() => _searchQuery = val),
-                                decoration: const InputDecoration(
-                                  hintText: 'Buscar demanda por nome ou cargo...',
-                                  prefixIcon: Icon(IconsaxPlusLinear.search_normal_1, color: AppColors.textSecondary),
-                                  border: InputBorder.none,
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Text(
+                                'Gestão de Vínculo: ${_selectedDemandForVinculo!.storeName} (${_selectedDemandForVinculo!.role})',
+                                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppColors.textPrimary),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        Expanded(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Quadro Esquerdo: Detalhes da Demanda Selecionada
+                              Expanded(
+                                flex: 3,
+                                child: _buildDemandDetailsColumn(_selectedDemandForVinculo!),
+                              ),
+                              const SizedBox(width: 16),
+                              // Quadro do Meio: Candidatos Inscritos (Numerados)
+                              Expanded(
+                                flex: 4,
+                                child: _buildCandidatesColumn(_selectedDemandForVinculo!, promoterMap),
+                              ),
+                              const SizedBox(width: 16),
+                              // Quadro Direito: Promotores Próximos (Raio até 20km)
+                              Expanded(
+                                flex: 4,
+                                child: _buildNearbyPromotersColumn(_selectedDemandForVinculo!, promoterMap),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ] else ...[
+                        // BARRA DE PESQUISA E FILTROS (Vínculo & Realocação)
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: AppColors.cardBorder),
+                                ),
+                                child: TextField(
+                                  onChanged: (val) => setState(() => _searchQuery = val),
+                                  decoration: const InputDecoration(
+                                    hintText: 'Buscar demanda por nome ou cargo...',
+                                    prefixIcon: Icon(IconsaxPlusLinear.search_normal_1, color: AppColors.textSecondary),
+                                    border: InputBorder.none,
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 15),
+                            OutlinedButton.icon(
+                              onPressed: () => setState(() => _filtersExpanded = !_filtersExpanded),
+                              icon: Icon(_filtersExpanded ? IconsaxPlusBold.filter : IconsaxPlusLinear.filter, color: AppColors.primaryBlue, size: 20),
+                              label: Text(_filtersExpanded ? 'FECHAR FILTROS' : 'FILTROS AVANÇADOS', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.primaryBlue)),
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: AppColors.primaryBlue),
+                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        filterPanel,
+                        const SizedBox(height: 12),
+                        
+                        // Lista Horizontal de Lojas/Demandas
+                        _buildHorizontalDemandList(filteredDemands),
+                        const SizedBox(height: 20),
+                        Expanded(
+                          child: _buildEmptyState('Selecione uma demanda na lista acima para iniciar a gestão de vínculo.'),
+                        ),
+                      ],
+                    ] else ...[
+                      // Cronograma view
+                      if (_selectedDemandForVinculo == null)
+                        Expanded(
+                          child: Center(
+                            child: Card(
+                              color: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: AppColors.cardBorder)),
+                              child: Padding(
+                                padding: const EdgeInsets.all(32.0),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.av_timer_rounded, size: 48, color: AppColors.primaryBlue),
+                                    const SizedBox(height: 16),
+                                    const Text('Cronograma da Vaga', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textPrimary)),
+                                    const SizedBox(height: 8),
+                                    const Text(
+                                      'Selecione uma vaga no Kanban (clicando no ícone do cronômetro)\nou no menu Vínculo & Realocação para visualizar sua cronologia.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(color: AppColors.textSecondary, fontSize: 12, height: 1.4),
+                                    ),
+                                    const SizedBox(height: 20),
+                                    ElevatedButton(
+                                      onPressed: () => setState(() => _activeTab = 0),
+                                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryBlue, foregroundColor: Colors.white),
+                                      child: const Text('IR PARA KANBAN', style: TextStyle(fontWeight: FontWeight.bold)),
+                                    )
+                                  ],
                                 ),
                               ),
                             ),
                           ),
-                          const SizedBox(width: 15),
-                          OutlinedButton.icon(
-                            onPressed: () => setState(() => _filtersExpanded = !_filtersExpanded),
-                            icon: Icon(_filtersExpanded ? IconsaxPlusBold.filter : IconsaxPlusLinear.filter, color: AppColors.primaryBlue, size: 20),
-                            label: Text(_filtersExpanded ? 'FECHAR FILTROS' : 'FILTROS AVANÇADOS', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.primaryBlue)),
-                            style: OutlinedButton.styleFrom(
-                              side: const BorderSide(color: AppColors.primaryBlue),
-                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
-                            ),
+                        )
+                      else
+                        Expanded(
+                          child: VacancyChronology(
+                            demand: _selectedDemandForVinculo!,
+                            promoterMap: promoterMap,
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      filterPanel,
-                      const SizedBox(height: 12),
-                      
-                      // Lista Horizontal de Lojas/Demandas
-                      _buildHorizontalDemandList(filteredDemands),
-                      const SizedBox(height: 20),
-                      
-                      // Três Quadros Inferiores Lado a Lado
-                      Expanded(
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Quadro Esquerdo: Detalhes da Demanda Selecionada
-                            Expanded(
-                              flex: 3,
-                              child: _selectedDemandForVinculo == null
-                                  ? _buildEmptyState('Selecione uma demanda na lista acima para visualizar os detalhes.')
-                                  : _buildDemandDetailsColumn(_selectedDemandForVinculo!),
-                            ),
-                            const SizedBox(width: 16),
-                            // Quadro do Meio: Candidatos Inscritos (Numerados)
-                            Expanded(
-                              flex: 4,
-                              child: _selectedDemandForVinculo == null
-                                  ? _buildEmptyState('Selecione uma demanda para visualizar os inscritos.')
-                                  : _buildCandidatesColumn(_selectedDemandForVinculo!, promoterMap),
-                            ),
-                            const SizedBox(width: 16),
-                            // Quadro Direito: Promotores Próximos (Raio até 30km)
-                            Expanded(
-                              flex: 4,
-                              child: _selectedDemandForVinculo == null
-                                  ? _buildEmptyState('Selecione uma demanda para visualizar promotores próximos.')
-                                  : _buildNearbyPromotersColumn(_selectedDemandForVinculo!, promoterMap),
-                            ),
-                          ],
                         ),
-                      ),
                     ],
                   ],
                 ),
@@ -1035,6 +1109,7 @@ class _DemandsManagementViewState extends State<DemandsManagementView> {
         children: [
           _buildTabButton(0, 'Visão Geral / Kanban', IconsaxPlusLinear.kanban),
           _buildTabButton(1, 'Vínculo & Realocação', IconsaxPlusLinear.profile_2user),
+          _buildTabButton(2, 'Cronograma da Vaga', IconsaxPlusLinear.routing),
         ],
       ),
     );
@@ -2545,7 +2620,45 @@ class _DemandsManagementViewState extends State<DemandsManagementView> {
                   children: [
                     const CircleAvatar(radius: 10, backgroundColor: AppColors.background, child: Icon(Icons.person, size: 12, color: AppColors.primaryBlue)),
                     const SizedBox(width: 8),
-                    Text(demand.assignedPromoter!, style: const TextStyle(color: AppColors.textPrimary, fontSize: 11, fontWeight: FontWeight.w700)),
+                    Expanded(
+                      child: Text(
+                        demand.assignedPromoter!,
+                        style: const TextStyle(color: AppColors.textPrimary, fontSize: 11, fontWeight: FontWeight.w700),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.av_timer_rounded, color: AppColors.primaryBlue, size: 18),
+                      tooltip: 'Ver Cronograma da Vaga',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: () {
+                        setState(() {
+                          _selectedDemandForVinculo = demand;
+                          _activeTab = 2;
+                        });
+                      },
+                    ),
+                  ],
+                )
+              ] else ...[
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.av_timer_rounded, color: AppColors.primaryBlue, size: 18),
+                      tooltip: 'Ver Cronograma da Vaga',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: () {
+                        setState(() {
+                          _selectedDemandForVinculo = demand;
+                          _activeTab = 2;
+                        });
+                      },
+                    ),
                   ],
                 )
               ]
@@ -2559,90 +2672,105 @@ class _DemandsManagementViewState extends State<DemandsManagementView> {
   Widget _buildHorizontalDemandList(List<AppDemand> demands) {
     if (demands.isEmpty) {
       return Container(
-        height: 110,
+        height: 140,
         alignment: Alignment.center,
         child: const Text('Nenhuma demanda encontrada.', style: TextStyle(color: AppColors.textSecondary)),
       );
     }
     return SizedBox(
-      height: 110,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: demands.length,
-        itemBuilder: (context, idx) {
-          final demand = demands[idx];
-          final isSelected = _selectedDemandForVinculo?.id == demand.id;
-          final double progress = demand.totalVagas > 0 ? demand.filledVagas / demand.totalVagas : 0;
-          return Container(
-            width: 250,
-            margin: const EdgeInsets.only(right: 12, bottom: 8, top: 4),
-            child: Card(
-              elevation: 0,
-              margin: EdgeInsets.zero,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: BorderSide(
-                  color: isSelected ? AppColors.primaryBlue : AppColors.cardBorder,
-                  width: isSelected ? 2 : 1,
-                ),
-              ),
-              color: isSelected ? AppColors.primaryBlue.withOpacity(0.03) : Colors.white,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: () {
-                  setState(() {
-                    _selectedDemandForVinculo = demand;
-                  });
-                },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        demand.storeName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
-                      ),
-                      Text(
-                        '${demand.role} • ${demand.clientName ?? ''}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
-                      ),
-                      Row(
+      height: 140,
+      child: ScrollConfiguration(
+        behavior: ScrollConfiguration.of(context).copyWith(
+          dragDevices: {
+            PointerDeviceKind.touch,
+            PointerDeviceKind.mouse,
+            PointerDeviceKind.trackpad,
+          },
+        ),
+        child: Scrollbar(
+          controller: _horizontalDemandScrollController,
+          thumbVisibility: true,
+          child: ListView.builder(
+            controller: _horizontalDemandScrollController,
+            scrollDirection: Axis.horizontal,
+            itemCount: demands.length,
+            itemBuilder: (context, idx) {
+              final demand = demands[idx];
+              final isSelected = _selectedDemandForVinculo?.id == demand.id;
+              final double progress = demand.totalVagas > 0 ? demand.filledVagas / demand.totalVagas : 0;
+              return Container(
+                width: 310,
+                margin: const EdgeInsets.only(right: 14, bottom: 12, top: 4),
+                child: Card(
+                  elevation: isSelected ? 4 : 0,
+                  shadowColor: AppColors.primaryBlue.withOpacity(0.1),
+                  margin: EdgeInsets.zero,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(
+                      color: isSelected ? AppColors.primaryBlue : AppColors.cardBorder,
+                      width: isSelected ? 2 : 1,
+                    ),
+                  ),
+                  color: isSelected ? AppColors.primaryBlue.withOpacity(0.04) : Colors.white,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () {
+                      setState(() {
+                        _selectedDemandForVinculo = demand;
+                      });
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            '${demand.date}',
-                            style: const TextStyle(color: AppColors.textSecondary, fontSize: 10, fontWeight: FontWeight.w500),
+                            demand.storeName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textPrimary),
                           ),
                           Text(
-                            '${demand.filledVagas}/${demand.totalVagas} vagas',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppColors.textPrimary),
+                            '${demand.role} • ${demand.clientName ?? ''}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w500),
+                          ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                '${demand.date}',
+                                style: const TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.w600),
+                              ),
+                              Text(
+                                '${demand.filledVagas}/${demand.totalVagas} vagas',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.textPrimary),
+                              ),
+                            ],
+                          ),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(3),
+                            child: LinearProgressIndicator(
+                              value: progress,
+                              backgroundColor: AppColors.background,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                progress == 1 ? AppColors.success : AppColors.primaryBlue,
+                              ),
+                              minHeight: 4,
+                            ),
                           ),
                         ],
                       ),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(2),
-                        child: LinearProgressIndicator(
-                          value: progress,
-                          backgroundColor: AppColors.background,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            progress == 1 ? AppColors.success : AppColors.primaryBlue,
-                          ),
-                          minHeight: 3,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
-            ),
-          );
-        },
+              );
+            },
+          ),
+        ),
       ),
     );
   }
@@ -3014,7 +3142,7 @@ class _DemandsManagementViewState extends State<DemandsManagementView> {
         'rawData': promoter,
       };
       
-      if (hasCoords && distance <= 30.0) {
+      if (hasCoords && distance <= 20.0) {
         nearbyPromoters.add(info);
       } else {
         otherPromoters.add(info);
@@ -3038,7 +3166,7 @@ class _DemandsManagementViewState extends State<DemandsManagementView> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'PROMOTORES PRÓXIMOS (ATÉ 30KM)',
+                'PROMOTORES PRÓXIMOS (ATÉ 20KM)',
                 style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12, color: AppColors.primaryBlue, letterSpacing: 0.5),
               ),
               Container(
@@ -3787,5 +3915,825 @@ class _EditDemandModalState extends State<EditDemandModal> {
     );
   }
 
+}
 
+class VacancyChronology extends StatefulWidget {
+  final AppDemand demand;
+  final Map<String, Map<String, dynamic>> promoterMap;
+
+  const VacancyChronology({
+    super.key,
+    required this.demand,
+    required this.promoterMap,
+  });
+
+  @override
+  State<VacancyChronology> createState() => _VacancyChronologyState();
+}
+
+class _VacancyChronologyState extends State<VacancyChronology> {
+  int _selectedStep = 1;
+  final _leftScrollCtrl = ScrollController();
+  final _rightScrollCtrl = ScrollController();
+
+  @override
+  void dispose() {
+    _leftScrollCtrl.dispose();
+    _rightScrollCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('applications')
+          .where('demandId', isEqualTo: widget.demand.id)
+          .snapshots(),
+      builder: (context, snapshot) {
+        final apps = snapshot.data?.docs ?? [];
+        final totalApplicants = apps.length;
+        
+        // Count how many applicants have curriculum details (represented as bio/presentation)
+        int bioCount = 0;
+        int trainingCompleteCount = 0;
+        int approvedCount = 0;
+
+        for (var doc in apps) {
+          final data = doc.data() as Map<String, dynamic>;
+          final String cpf = data['promoterCpf'] ?? '';
+          final status = data['status'] ?? '';
+          
+          if (status == 'aprovado' || status == 'selecionado') {
+            approvedCount++;
+          }
+          final promoter = widget.promoterMap[cpf];
+          if (promoter != null) {
+            final cv = promoter['curriculumResumo'] ?? promoter['curriculumCompletoDados'];
+            if (cv != null) bioCount++;
+            final finishedTraining = promoter['trainingCompleted'] == true || status == 'aprovado';
+            if (finishedTraining) trainingCompleteCount++;
+          }
+        }
+
+        // Steps list
+        final steps = [
+          _ChronologyStep(
+            title: 'Abertura da Vaga',
+            subtitle: 'Publicada em ${widget.demand.date}',
+            icon: IconsaxPlusLinear.add_square,
+            status: _StepStatus.completed,
+            details: _buildAberturaDetails(),
+          ),
+          _ChronologyStep(
+            title: 'Captação & Cadastros',
+            subtitle: '$totalApplicants candidatos interessados',
+            icon: IconsaxPlusLinear.people,
+            status: totalApplicants > 0 ? _StepStatus.completed : _StepStatus.active,
+            details: _buildCaptacaoDetails(totalApplicants),
+          ),
+          _ChronologyStep(
+            title: 'Carta de Apresentação',
+            subtitle: '$bioCount apresentações recebidas',
+            icon: IconsaxPlusLinear.document_text,
+            status: bioCount > 0 ? _StepStatus.completed : _StepStatus.active,
+            details: _buildCartaDetails(bioCount, apps),
+          ),
+          _ChronologyStep(
+            title: 'Treinamento Obrigatório',
+            subtitle: '$trainingCompleteCount concluíram o treinamento',
+            icon: IconsaxPlusLinear.teacher,
+            status: trainingCompleteCount > 0 ? _StepStatus.completed : _StepStatus.active,
+            details: _buildTreinamentoDetails(trainingCompleteCount, apps),
+          ),
+          _ChronologyStep(
+            title: 'Aptos para Iniciar',
+            subtitle: '$approvedCount selecionados na triagem',
+            icon: IconsaxPlusLinear.shield_search,
+            status: approvedCount == widget.demand.totalVagas && approvedCount > 0
+                ? _StepStatus.completed 
+                : (approvedCount > 0 ? _StepStatus.active : _StepStatus.locked),
+            details: _buildAptosDetails(approvedCount, apps),
+          ),
+          _ChronologyStep(
+            title: 'Na Loja no Dia',
+            subtitle: widget.demand.status == 'EM ANDAMENTO' || widget.demand.status == 'FINALIZADAS'
+                ? 'Check-in validado com sucesso'
+                : 'Aguardando data da diária',
+            icon: IconsaxPlusLinear.gps,
+            status: widget.demand.status == 'EM ANDAMENTO' || widget.demand.status == 'FINALIZADAS'
+                ? _StepStatus.completed
+                : _StepStatus.locked,
+            details: _buildPresencaDetails(),
+          ),
+          _ChronologyStep(
+            title: 'Ação Realizada',
+            subtitle: widget.demand.status == 'FINALIZADAS'
+                ? 'Relatório final homologado'
+                : 'Aguardando término do serviço',
+            icon: IconsaxPlusLinear.task,
+            status: widget.demand.status == 'FINALIZADAS' 
+                ? _StepStatus.completed 
+                : _StepStatus.locked,
+            details: _buildAcaoDetails(),
+          ),
+        ];
+
+        return Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.cardBorder),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Left Column: Step List
+              SizedBox(
+                width: 380,
+                child: Scrollbar(
+                  controller: _leftScrollCtrl,
+                  thumbVisibility: true,
+                  child: SingleChildScrollView(
+                    controller: _leftScrollCtrl,
+                    padding: const EdgeInsets.only(right: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'CRONOLOGIA DA VAGA - ${widget.demand.storeName.toUpperCase()}',
+                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: AppColors.textPrimary, letterSpacing: 0.5),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Acompanhe o funil de contratação e as etapas logísticas.',
+                          style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                        ),
+                        const SizedBox(height: 24),
+                        ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: steps.length,
+                          itemBuilder: (context, index) {
+                            final step = steps[index];
+                            final isSelected = _selectedStep == index;
+                            return InkWell(
+                              onTap: () {
+                                setState(() {
+                                  _selectedStep = index;
+                                });
+                              },
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 4),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                                decoration: BoxDecoration(
+                                  color: isSelected 
+                                      ? AppColors.primaryBlue.withOpacity(0.04) 
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: isSelected 
+                                        ? AppColors.primaryBlue.withOpacity(0.15) 
+                                        : Colors.transparent,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    _buildStatusBadge(step.status),
+                                    const SizedBox(width: 14),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            step.title,
+                                            style: TextStyle(
+                                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                                              fontSize: 13,
+                                              color: isSelected 
+                                                  ? AppColors.primaryBlue 
+                                                  : AppColors.textPrimary,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 3),
+                                          Text(
+                                            step.subtitle,
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: AppColors.textSecondary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Icon(
+                                      step.icon,
+                                      size: 18,
+                                      color: isSelected 
+                                          ? AppColors.primaryBlue 
+                                          : AppColors.textSecondary.withOpacity(0.6),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 32),
+              
+              // Divider line
+              Container(width: 1, color: AppColors.cardBorder),
+              const SizedBox(width: 32),
+
+              // Right Column: Detail Panel
+              Expanded(
+                child: Scrollbar(
+                  controller: _rightScrollCtrl,
+                  thumbVisibility: true,
+                  child: SingleChildScrollView(
+                    controller: _rightScrollCtrl,
+                    padding: const EdgeInsets.only(right: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryBlue.withOpacity(0.03),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.primaryBlue.withOpacity(0.1)),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(steps[_selectedStep].icon, color: AppColors.primaryBlue),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Detalhes: ${steps[_selectedStep].title}',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.primaryBlue),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        steps[_selectedStep].details,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildStatusBadge(_StepStatus status) {
+    switch (status) {
+      case _StepStatus.completed:
+        return Container(
+          width: 24,
+          height: 24,
+          decoration: const BoxDecoration(color: AppColors.success, shape: BoxShape.circle),
+          child: const Icon(Icons.check, color: Colors.white, size: 14),
+        );
+      case _StepStatus.active:
+        return Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+            border: Border.all(color: AppColors.primaryBlue, width: 2),
+          ),
+          child: const Center(
+            child: SizedBox(
+              width: 10,
+              height: 10,
+              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primaryBlue),
+            ),
+          ),
+        );
+      case _StepStatus.locked:
+      default:
+        return Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(color: Colors.grey[200], shape: BoxShape.circle),
+          child: const Icon(Icons.lock_outline_rounded, color: Colors.grey, size: 14),
+        );
+    }
+  }
+
+  Widget _buildAberturaDetails() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildInfoRow('Estabelecimento', widget.demand.storeName),
+        _buildInfoRow('Função/Cargo', widget.demand.role),
+        _buildInfoRow('Cliente parceiro', widget.demand.clientName ?? 'Não especificado'),
+        _buildInfoRow('Data da diária', widget.demand.date),
+        _buildInfoRow('Horário programado', widget.demand.timeRange),
+        _buildInfoRow('Valor da diária', 'R\$ ${widget.demand.value.toStringAsFixed(2)}'),
+        _buildInfoRow('Prioridade operacional', widget.demand.priority),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.green.withOpacity(0.06),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.green.withOpacity(0.15)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.check_circle_outline, color: AppColors.success),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Vaga registrada e ativa na nuvem. Candidatos na proximidade já receberam alertas push.',
+                  style: TextStyle(color: Colors.green[800], fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCaptacaoDetails(int total) {
+    // Generate some mock history dates for the chart based on the demand date
+    final dates = <String>[];
+    for (int i = 4; i >= 0; i--) {
+      dates.add('D-$i');
+    }
+    // Proportional mock values based on total
+    final mockValues = <double>[];
+    if (total == 0) {
+      mockValues.addAll([0, 0, 0, 0, 0]);
+    } else {
+      mockValues.addAll([
+        (total * 0.1).ceilToDouble(),
+        (total * 0.25).ceilToDouble(),
+        (total * 0.5).ceilToDouble(),
+        (total * 0.8).ceilToDouble(),
+        total.toDouble(),
+      ]);
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            _buildStatCard('Total de Inscritos', total.toString(), AppColors.primaryBlue),
+            const SizedBox(width: 16),
+            _buildStatCard('Meta de Atração', '${widget.demand.totalVagas * 4} candidatos', AppColors.textSecondary),
+          ],
+        ),
+        const SizedBox(height: 24),
+        const Text(
+          'Evolução Diária de Candidaturas (Histórico)',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
+        ),
+        const SizedBox(height: 16),
+        Card(
+          color: AppColors.background,
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: AppColors.cardBorder)),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: CustomHistogram(
+              values: mockValues,
+              labels: dates,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCartaDetails(int count, List<QueryDocumentSnapshot> apps) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Recebimento de Carta de Apresentação ($count)',
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
+        ),
+        const SizedBox(height: 16),
+        if (count == 0)
+          _buildSubEmptyState('Nenhuma carta ou resumo de apresentação recebido ainda.')
+        else
+          SizedBox(
+            height: 300,
+            child: ListView.builder(
+              itemCount: apps.length,
+              itemBuilder: (context, index) {
+                final appData = apps[index].data() as Map<String, dynamic>;
+                final String cpf = appData['promoterCpf'] ?? '';
+                final promoter = widget.promoterMap[cpf];
+                if (promoter == null) return const SizedBox.shrink();
+                final cv = getCurriculumData(promoter);
+                final resumo = promoter['curriculumResumo'] ?? cv['dados_pessoais']?['resumo'] ?? 'Apresentação curta enviada.';
+
+                return Card(
+                  color: Colors.white,
+                  elevation: 0,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: const BorderSide(color: AppColors.cardBorder)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const CircleAvatar(radius: 12, backgroundColor: AppColors.background, child: Icon(Icons.person, size: 12, color: AppColors.primaryBlue)),
+                            const SizedBox(width: 10),
+                            Text(promoter['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary)),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          '"$resumo"',
+                          style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: AppColors.textSecondary, height: 1.4),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildTreinamentoDetails(int count, List<QueryDocumentSnapshot> apps) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Módulos de Treinamento Obrigatório Concluídos',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
+        ),
+        const SizedBox(height: 16),
+        if (apps.isEmpty)
+          _buildSubEmptyState('Nenhum candidato aguardando treinamento.')
+        else
+          SizedBox(
+            height: 300,
+            child: ListView.builder(
+              itemCount: apps.length,
+              itemBuilder: (context, index) {
+                final appData = apps[index].data() as Map<String, dynamic>;
+                final String cpf = appData['promoterCpf'] ?? '';
+                final promoter = widget.promoterMap[cpf];
+                if (promoter == null) return const SizedBox.shrink();
+                final isComplete = promoter['trainingCompleted'] == true || appData['status'] == 'aprovado';
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.cardBorder),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(promoter['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: AppColors.textPrimary)),
+                      Row(
+                        children: [
+                          Text(
+                            isComplete ? '100% Concluído' : '0% - Pendente',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: isComplete ? AppColors.success : AppColors.warning,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Icon(
+                            isComplete ? Icons.check_circle : Icons.radio_button_unchecked,
+                            color: isComplete ? AppColors.success : AppColors.warning,
+                            size: 16,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildAptosDetails(int approvedCount, List<QueryDocumentSnapshot> apps) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Prestadores Selecionados para Iniciar a Ação',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
+        ),
+        const SizedBox(height: 16),
+        if (approvedCount == 0)
+          _buildSubEmptyState('Nenhum candidato aprovado ou alocado nesta vaga ainda.')
+        else
+          SizedBox(
+            height: 300,
+            child: ListView.builder(
+              itemCount: apps.length,
+              itemBuilder: (context, index) {
+                final appData = apps[index].data() as Map<String, dynamic>;
+                final String cpf = appData['promoterCpf'] ?? '';
+                final promoter = widget.promoterMap[cpf];
+                if (promoter == null) return const SizedBox.shrink();
+                final isApproved = appData['status'] == 'aprovado' || appData['status'] == 'selecionado';
+                if (!isApproved) return const SizedBox.shrink();
+
+                return Card(
+                  color: Colors.white,
+                  elevation: 0,
+                  margin: const EdgeInsets.only(bottom: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: const BorderSide(color: AppColors.cardBorder)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.verified, color: AppColors.primaryBlue, size: 18),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            promoter['name'] ?? '',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.textPrimary),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(color: Colors.blue.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
+                          child: const Text('ALOCADO', style: TextStyle(color: AppColors.primaryBlue, fontSize: 9, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildPresencaDetails() {
+    final hasCheckIn = widget.demand.status == 'EM ANDAMENTO' || widget.demand.status == 'FINALIZADAS';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildInfoRow('Check-in Exigido', widget.demand.requiresCheckIn == false ? 'Não' : 'Sim'),
+        _buildInfoRow('Raio de tolerância GPS', '${widget.demand.allowedRadius ?? 200} metros'),
+        _buildInfoRow('Exigência de Foto da fachada', widget.demand.requiresPhoto == false ? 'Não' : 'Sim'),
+        const SizedBox(height: 24),
+        const Text(
+          'Registro de Presença em Tempo Real',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
+        ),
+        const SizedBox(height: 16),
+        if (!hasCheckIn)
+          _buildSubEmptyState('Aguardando check-in no dia de trabalho.')
+        else
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.green.withOpacity(0.06),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.green.withOpacity(0.15)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.gps_fixed, color: AppColors.success, size: 20),
+                    const SizedBox(width: 10),
+                    const Text('CHECK-IN REALIZADO', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.success)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Prestador chegou na loja e realizou check-in validado via GPS às ${widget.demand.entryTime ?? "08:00"}.',
+                  style: const TextStyle(fontSize: 12, color: AppColors.textPrimary, height: 1.4),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildAcaoDetails() {
+    final hasReport = widget.demand.status == 'FINALIZADAS';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildInfoRow('Instruções de Execução', widget.demand.instructions ?? 'Padrão de reposição'),
+        _buildInfoRow('Atividades obrigatórias', widget.demand.requiredActivity ?? 'Registro fotográfico das gôndolas'),
+        const SizedBox(height: 24),
+        const Text(
+          'Status do Relatório de Campo',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
+        ),
+        const SizedBox(height: 16),
+        if (!hasReport)
+          _buildSubEmptyState('Aguardando a conclusão dos serviços na loja.')
+        else
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.green.withOpacity(0.06),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.green.withOpacity(0.15)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.analytics_outlined, color: AppColors.success, size: 20),
+                    const SizedBox(width: 10),
+                    const Text('AÇÃO HOMOLOGADA', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.success)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'O promotor alocado concluiu as atividades obrigatórias, preencheu a pesquisa de campo e realizou o check-out. O saldo foi liberado para pagamento.',
+                  style: TextStyle(fontSize: 12, color: AppColors.textPrimary, height: 1.4),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 160,
+            child: Text(
+              label.toUpperCase(),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppColors.textSecondary, letterSpacing: 0.5),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatCard(String label, String value, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.04),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withOpacity(0.15)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color)),
+            const SizedBox(height: 8),
+            Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: color)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSubEmptyState(String msg) {
+    return Container(
+      width: double.maxFinite,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        msg,
+        style: const TextStyle(color: AppColors.textSecondary, fontSize: 12, fontStyle: FontStyle.italic),
+      ),
+    );
+  }
+
+  Map<String, dynamic> getCurriculumData(Map<String, dynamic> promoter) {
+    if (promoter['curriculumCompletoDados'] != null) {
+      try {
+        return jsonDecode(promoter['curriculumCompletoDados'] as String) as Map<String, dynamic>;
+      } catch (_) {}
+    }
+    return {};
+  }
+}
+
+class _ChronologyStep {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final _StepStatus status;
+  final Widget details;
+
+  const _ChronologyStep({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.status,
+    required this.details,
+  });
+}
+
+enum _StepStatus { completed, active, locked }
+
+class CustomHistogram extends StatelessWidget {
+  final List<double> values;
+  final List<String> labels;
+
+  const CustomHistogram({
+    super.key,
+    required this.values,
+    required this.labels,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    double maxValue = values.isEmpty ? 1.0 : values.reduce(math.max);
+    if (maxValue == 0) maxValue = 1.0;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: List.generate(values.length, (idx) {
+        final val = values[idx];
+        final label = labels[idx];
+        final pct = val / maxValue;
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              val.toInt().toString(),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppColors.primaryBlue),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              width: 32,
+              height: 120 * pct,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [AppColors.primaryBlue, Colors.cyanAccent],
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                ),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primaryBlue.withOpacity(0.2),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: const TextStyle(fontSize: 10, color: AppColors.textSecondary, fontWeight: FontWeight.bold),
+            ),
+          ],
+        );
+      }),
+    );
+  }
 }
