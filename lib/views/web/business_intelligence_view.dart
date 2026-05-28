@@ -127,8 +127,27 @@ class _BusinessIntelligenceViewState extends State<BusinessIntelligenceView> {
   );
 }
 
-class BIContent extends StatelessWidget {
+class BIContent extends StatefulWidget {
   const BIContent({super.key});
+
+  @override
+  State<BIContent> createState() => _BIContentState();
+}
+
+class _BIContentState extends State<BIContent> {
+  late final Stream<QuerySnapshot<Map<String, dynamic>>> _appsStream;
+  late final Stream<QuerySnapshot<Map<String, dynamic>>> _usersStream;
+  late final Stream<QuerySnapshot<Map<String, dynamic>>> _storesStream;
+  late final Stream<QuerySnapshot<Map<String, dynamic>>> _chatsStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _appsStream = FirebaseFirestore.instance.collection('applications').snapshots();
+    _usersStream = FirebaseFirestore.instance.collection('users').snapshots();
+    _storesStream = FirebaseFirestore.instance.collection('stores').snapshots();
+    _chatsStream = FirebaseFirestore.instance.collection('support_chats').snapshots();
+  }
 
   String _formatCurrency(double val) {
     final parts = val.toStringAsFixed(2).split('.');
@@ -145,295 +164,517 @@ class BIContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(40),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const PremiumHeader(
-            title: 'Bem-vindo(a) de volta!', 
-            subtitle: 'Sua operação esta em movimento.\nAcompanhe resultados, valide execuções e transforme dados em performance.'
-          ),
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: _appsStream,
+      builder: (context, appsSnapshot) {
+        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: _usersStream,
+          builder: (context, usersSnapshot) {
+            return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: _storesStream,
+              builder: (context, storesSnapshot) {
+                return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: _chatsStream,
+                  builder: (context, chatsSnapshot) {
+                    if (appsSnapshot.connectionState == ConnectionState.waiting ||
+                        usersSnapshot.connectionState == ConnectionState.waiting ||
+                        storesSnapshot.connectionState == ConnectionState.waiting ||
+                        chatsSnapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(
+                        child: CircularProgressIndicator(color: AppColors.primaryBlue),
+                      );
+                    }
 
-          const SizedBox(height: 32),
-          
-          // Big Numbers (6 cards)
-          GridView.count(
-            crossAxisCount: 6,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: 15,
-            mainAxisSpacing: 15,
-            childAspectRatio: 1.5,
-            children: [
-              // 1. Diárias Pagas (Real)
-              StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                stream: FirebaseFirestore.instance
-                    .collection('applications')
-                    .where('status', isEqualTo: 'pago')
-                    .snapshots(),
-                builder: (context, snapshot) {
-                  double total = 0;
-                  if (snapshot.hasData) {
-                    for (var doc in snapshot.data!.docs) {
-                      final val = doc.data()['value'];
-                      if (val is num) {
-                        total += val.toDouble();
+                    final appsDocs = appsSnapshot.data?.docs ?? [];
+                    final usersDocs = usersSnapshot.data?.docs ?? [];
+                    final storesDocs = storesSnapshot.data?.docs ?? [];
+                    final chatsDocs = chatsSnapshot.data?.docs ?? [];
+
+                    // 1. Big Numbers:
+                    // Diárias Pagas
+                    double paidTotal = 0;
+                    // Diárias Pendentes
+                    double pendingTotal = 0;
+                    // Taxa de Validação (approved / (approved + notApproved))
+                    int approvedCount = 0;
+                    int notApprovedCount = 0;
+
+                    for (var doc in appsDocs) {
+                      final data = doc.data();
+                      final status = data['status'] ?? '';
+                      final valNum = data['value'];
+                      double val = 0.0;
+                      if (valNum is num) {
+                        val = valNum.toDouble();
                       }
-                    }
-                  }
-                  return _buildBigNumberCard('Diárias Pagas', _formatCurrency(total), Icons.payments, AppColors.success, 'Pago');
-                },
-              ),
-              // 2. Lojas Ativas (Real)
-              StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                stream: FirebaseFirestore.instance.collection('stores').snapshots(),
-                builder: (context, snapshot) {
-                  final count = snapshot.hasData ? snapshot.data!.docs.length : 0;
-                  return _buildBigNumberCard('Lojas Ativas', '$count', Icons.storefront, AppColors.primaryBlue, 'Cadastradas');
-                },
-              ),
-              // 3. Cadastros Prestador (Real)
-              StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                stream: FirebaseFirestore.instance
-                    .collection('users')
-                    .where('type', isEqualTo: 'prestador')
-                    .snapshots(),
-                builder: (context, snapshot) {
-                  final count = snapshot.hasData ? snapshot.data!.docs.length : 0;
-                  return _buildBigNumberCard('Cadastros Prestador', '$count', Icons.people, AppColors.warning, 'Total');
-                },
-              ),
-              // 4. Diárias Pendentes (Real)
-              StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                stream: FirebaseFirestore.instance
-                    .collection('applications')
-                    .where('status', isEqualTo: 'liberado_pagamento')
-                    .snapshots(),
-                builder: (context, snapshot) {
-                  double total = 0;
-                  if (snapshot.hasData) {
-                    for (var doc in snapshot.data!.docs) {
-                      final val = doc.data()['value'];
-                      if (val is num) {
-                        total += val.toDouble();
-                      }
-                    }
-                  }
-                  return _buildBigNumberCard('Diárias Pendentes', _formatCurrency(total), Icons.hourglass_empty, Colors.purple, 'Em liberação');
-                },
-              ),
-              // 5. Taxa de Validação (Real)
-              StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                stream: FirebaseFirestore.instance.collection('applications').snapshots(),
-                builder: (context, snapshot) {
-                  int approved = 0;
-                  int notApproved = 0;
-                  if (snapshot.hasData) {
-                    for (var doc in snapshot.data!.docs) {
-                      final status = doc.data()['status'] ?? '';
-                      if (status == 'liberado_pagamento' || status == 'pago') {
-                        approved++;
+
+                      if (status == 'pago') {
+                        paidTotal += val;
+                        approvedCount++;
+                      } else if (status == 'liberado_pagamento') {
+                        pendingTotal += val;
+                        approvedCount++;
                       } else if (status == 'nao_aprovada') {
-                        notApproved++;
+                        notApprovedCount++;
                       }
                     }
-                  }
-                  double rate = 100.0;
-                  final total = approved + notApproved;
-                  if (total > 0) {
-                    rate = (approved / total) * 100;
-                  }
-                  return _buildBigNumberCard('Taxa de Validação', '${rate.toStringAsFixed(1).replaceAll('.', ',')}%', Icons.fact_check, Colors.teal, 'Aprovação');
-                },
-              ),
-              // 6. Mensagens Não Lidas (Real)
-              StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                stream: FirebaseFirestore.instance.collection('support_chats').snapshots(),
-                builder: (context, snapshot) {
-                  int totalUnread = 0;
-                  int activeChatsCount = 0;
-                  if (snapshot.hasData) {
-                    for (var doc in snapshot.data!.docs) {
+
+                    double validationRate = 100.0;
+                    final totalVal = approvedCount + notApprovedCount;
+                    if (totalVal > 0) {
+                      validationRate = (approvedCount / totalVal) * 100;
+                    }
+
+                    // Lojas Ativas
+                    final storesCount = storesDocs.length;
+
+                    // Cadastros Prestador (users where type == 'prestador')
+                    int promoterCount = 0;
+                    final Map<String, String> promoterNames = {};
+                    for (var doc in usersDocs) {
+                      final data = doc.data();
+                      final type = data['type'] ?? '';
+                      if (type == 'prestador') {
+                        promoterCount++;
+                      }
+                      final name = data['name'] ?? '';
+                      if (name.isNotEmpty) {
+                        promoterNames[doc.id] = name;
+                      }
+                    }
+
+                    // Mensagens não lidas
+                    int totalUnreadChats = 0;
+                    int activeChatsCount = 0;
+                    for (var doc in chatsDocs) {
                       final unread = doc.data()['unreadCountAdmin'] ?? 0;
                       if (unread is num && unread > 0) {
-                        totalUnread += unread.toInt();
+                        totalUnreadChats += unread.toInt();
                         activeChatsCount++;
                       }
                     }
-                  }
-                  return _buildBigNumberCard('Mensagens Não Lidas', '$totalUnread', Icons.chat_bubble_outline_rounded, Colors.blueGrey, '$activeChatsCount chats ativos');
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 32),
-          
-          // Row for Bar Chart and Pie Chart
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Bar Chart (Acompanhamento de Diárias) - MOCK
-              Expanded(
-                flex: 2,
-                child: PremiumCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Acompanhamento de Diárias', style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold)),
-                      const Text('Comparativo dos últimos 7 dias', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-                      const SizedBox(height: 40),
-                      SizedBox(
-                        height: 250,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            _buildMockBar('Sex 10/05', 0.52, 'R\$ 5.200'),
-                            _buildMockBar('Sáb 11/05', 0.61, 'R\$ 6.100'),
-                            _buildMockBar('Dom 12/05', 0.34, 'R\$ 3.400'),
-                            _buildMockBar('Seg 13/05', 0.78, 'R\$ 7.800'),
-                            _buildMockBar('Ter 14/05', 0.84, 'R\$ 8.400'),
-                            _buildMockBar('Qua 15/05', 0.75, 'R\$ 7.500'),
-                            _buildMockBar('Qui 16/05', 0.68, 'R\$ 6.800'),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 20),
-              // Pie Chart (Distribuição de Status) - MOCK
-              Expanded(
-                flex: 1,
-                child: PremiumCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Distribuição de Status das Diárias', style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold)),
-                      const Text('Em relação ao total dos últimos 7 dias', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-                      const SizedBox(height: 40),
-                      SizedBox(
-                        height: 250,
-                        child: Center(
-                          child: Stack(
-                            alignment: Alignment.center,
+
+                    // 2. Bar Chart & Pie Chart & validation rates over last 7 days:
+                    final now = DateTime.now();
+                    final List<DateTime> last7Days = List.generate(7, (i) {
+                      return DateTime(now.year, now.month, now.day).subtract(Duration(days: 6 - i));
+                    });
+
+                    // Helper to check if two DateTimes are the same calendar day
+                    bool isSameDay(DateTime d1, DateTime d2) {
+                      return d1.year == d2.year && d1.month == d2.month && d1.day == d2.day;
+                    }
+
+                    // Date parsing helper
+                    DateTime? parseAppDate(Map<String, dynamic> data) {
+                      final subAt = data['submittedAt'];
+                      if (subAt is String) {
+                        try {
+                          return DateTime.parse(subAt);
+                        } catch (_) {}
+                      }
+                      final updAt = data['updatedAt'];
+                      if (updAt is String) {
+                        try {
+                          return DateTime.parse(updAt);
+                        } catch (_) {}
+                      }
+                      return null;
+                    }
+
+                    // Bar Chart data (sums for last 7 days)
+                    final List<double> dailySums = List.filled(7, 0.0);
+                    final List<String> dailyLabels = List.filled(7, '');
+
+                    // Pie Chart data (Pagas vs Pendentes in last 7 days)
+                    double paid7Days = 0.0;
+                    double pending7Days = 0.0;
+
+                    // Validation Rate over last 7 days
+                    final List<int> dailyApproved = List.filled(7, 0);
+                    final List<int> dailyNotApproved = List.filled(7, 0);
+
+                    for (var doc in appsDocs) {
+                      final data = doc.data();
+                      final appDate = parseAppDate(data);
+                      if (appDate == null) continue;
+
+                      final status = data['status'] ?? '';
+                      final valNum = data['value'];
+                      double val = 0.0;
+                      if (valNum is num) {
+                        val = valNum.toDouble();
+                      }
+
+                      // Check if it's within the last 7 days
+                      for (int i = 0; i < 7; i++) {
+                        if (isSameDay(appDate, last7Days[i])) {
+                          // Bar chart aggregates active statuses
+                          if (status == 'pago' ||
+                              status == 'liberado_pagamento' ||
+                              status == 'em_analise' ||
+                              status == 'tarefa_aprovada' ||
+                              status == 'em_andamento') {
+                            dailySums[i] += val;
+                          }
+
+                          // Pie chart aggregates last 7 days paid vs pending
+                          if (status == 'pago') {
+                            paid7Days += val;
+                          } else if (status == 'liberado_pagamento' ||
+                                     status == 'em_analise' ||
+                                     status == 'tarefa_aprovada' ||
+                                     status == 'em_andamento') {
+                            pending7Days += val;
+                          }
+
+                          // Validation rates daily
+                          if (status == 'pago' || status == 'liberado_pagamento') {
+                            dailyApproved[i]++;
+                          } else if (status == 'nao_aprovada') {
+                            dailyNotApproved[i]++;
+                          }
+                          break;
+                        }
+                      }
+                    }
+
+                    // Labels for Bar Chart
+                    const weekdays = {
+                      DateTime.monday: 'Seg',
+                      DateTime.tuesday: 'Ter',
+                      DateTime.wednesday: 'Qua',
+                      DateTime.thursday: 'Qui',
+                      DateTime.friday: 'Sex',
+                      DateTime.saturday: 'Sáb',
+                      DateTime.sunday: 'Dom',
+                    };
+
+                    for (int i = 0; i < 7; i++) {
+                      final dt = last7Days[i];
+                      final dayStr = dt.day.toString().padLeft(2, '0');
+                      final monthStr = dt.month.toString().padLeft(2, '0');
+                      final dayName = weekdays[dt.weekday] ?? '';
+                      dailyLabels[i] = '$dayName $dayStr/$monthStr';
+                    }
+
+                    // Normalize Bar Chart heights
+                    double maxDailySum = 0.0;
+                    for (var sum in dailySums) {
+                      if (sum > maxDailySum) {
+                        maxDailySum = sum;
+                      }
+                    }
+
+                    // 3. Pie Chart distributions
+                    final totalPie = paid7Days + pending7Days;
+                    final pieProgressVal = totalPie > 0 ? paid7Days / totalPie : 0.0;
+
+                    // 4. Ranking de Lojas (all time paid value, and comparison with past 7 days)
+                    final Map<String, double> storeTotalPaid = {};
+                    final Map<String, double> storeCurrentWeekPaid = {};
+                    final Map<String, double> storePreviousWeekPaid = {};
+
+                    final dtStartCurrent = last7Days[0]; // 6 days ago start
+                    final dtStartPrevious = dtStartCurrent.subtract(const Duration(days: 7));
+
+                    for (var doc in appsDocs) {
+                      final data = doc.data();
+                      final status = data['status'] ?? '';
+                      if (status != 'pago') continue;
+
+                      final storeName = data['storeName'] ?? 'Outra Loja';
+                      final valNum = data['value'];
+                      double val = 0.0;
+                      if (valNum is num) {
+                        val = valNum.toDouble();
+                      }
+
+                      storeTotalPaid[storeName] = (storeTotalPaid[storeName] ?? 0.0) + val;
+
+                      final appDate = parseAppDate(data);
+                      if (appDate != null) {
+                        if (appDate.isAfter(dtStartCurrent) || isSameDay(appDate, dtStartCurrent)) {
+                          storeCurrentWeekPaid[storeName] = (storeCurrentWeekPaid[storeName] ?? 0.0) + val;
+                        } else if (appDate.isAfter(dtStartPrevious) && appDate.isBefore(dtStartCurrent)) {
+                          storePreviousWeekPaid[storeName] = (storePreviousWeekPaid[storeName] ?? 0.0) + val;
+                        }
+                      }
+                    }
+
+                    final sortedStores = storeTotalPaid.entries.toList()
+                      ..sort((a, b) => b.value.compareTo(a.value));
+
+                    // 5. Top Promotores (all time paid value)
+                    final Map<String, double> promoterTotalPaid = {};
+                    final Map<String, int> promoterPaidCount = {};
+
+                    for (var doc in appsDocs) {
+                      final data = doc.data();
+                      final status = data['status'] ?? '';
+                      if (status != 'pago') continue;
+
+                      final cpf = data['promoterCpf'] ?? '';
+                      if (cpf.isEmpty) continue;
+
+                      final valNum = data['value'];
+                      double val = 0.0;
+                      if (valNum is num) {
+                        val = valNum.toDouble();
+                      }
+
+                      promoterTotalPaid[cpf] = (promoterTotalPaid[cpf] ?? 0.0) + val;
+                      promoterPaidCount[cpf] = (promoterPaidCount[cpf] ?? 0) + 1;
+                    }
+
+                    final sortedPromoters = promoterTotalPaid.entries.toList()
+                      ..sort((a, b) => b.value.compareTo(a.value));
+
+                    // 6. Validation Rate Line chart points
+                    final List<String> dailyValidationRates = List.filled(7, '');
+                    final List<double> dailyRateFactors = List.filled(7, 0.0);
+
+                    for (int i = 0; i < 7; i++) {
+                      final appCount = dailyApproved[i] + dailyNotApproved[i];
+                      double rate = 100.0;
+                      if (appCount > 0) {
+                        rate = (dailyApproved[i] / appCount) * 100;
+                      }
+                      dailyValidationRates[i] = '${rate.toStringAsFixed(1).replaceAll('.', ',')}%';
+                      dailyRateFactors[i] = rate / 100.0;
+                    }
+
+                    return SingleChildScrollView(
+                      padding: const EdgeInsets.all(40),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const PremiumHeader(
+                            title: 'Bem-vindo(a) de volta!', 
+                            subtitle: 'Sua operação esta em movimento.\nAcompanhe resultados, valide execuções e transforme dados em performance.'
+                          ),
+
+                          const SizedBox(height: 32),
+                          
+                          // Big Numbers (6 cards)
+                          GridView.count(
+                            crossAxisCount: 6,
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            crossAxisSpacing: 15,
+                            mainAxisSpacing: 15,
+                            childAspectRatio: 1.5,
                             children: [
-                              SizedBox(
-                                width: 160,
-                                height: 160,
-                                child: CircularProgressIndicator(
-                                  value: 0.838,
-                                  strokeWidth: 24,
-                                  backgroundColor: Colors.orange.withOpacity(0.2),
-                                  valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryBlue),
+                              _buildBigNumberCard('Diárias Pagas', _formatCurrency(paidTotal), Icons.payments, AppColors.success, 'Pago'),
+                              _buildBigNumberCard('Lojas Ativas', '$storesCount', Icons.storefront, AppColors.primaryBlue, 'Cadastradas'),
+                              _buildBigNumberCard('Cadastros Prestador', '$promoterCount', Icons.people, AppColors.warning, 'Total'),
+                              _buildBigNumberCard('Diárias Pendentes', _formatCurrency(pendingTotal), Icons.hourglass_empty, Colors.purple, 'Em liberação'),
+                              _buildBigNumberCard('Taxa de Validação', '${validationRate.toStringAsFixed(1).replaceAll('.', ',')}%', Icons.fact_check, Colors.teal, 'Aprovação'),
+                              _buildBigNumberCard('Mensagens Não Lidas', '$totalUnreadChats', Icons.chat_bubble_outline_rounded, Colors.blueGrey, '$activeChatsCount chats ativos'),
+                            ],
+                          ),
+                          const SizedBox(height: 32),
+                          
+                          // Row for Bar Chart and Pie Chart
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Bar Chart (Acompanhamento de Diárias)
+                              Expanded(
+                                flex: 2,
+                                child: PremiumCard(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text('Acompanhamento de Diárias', style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold)),
+                                      const Text('Comparativo dos últimos 7 dias', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                                      const SizedBox(height: 40),
+                                      SizedBox(
+                                        height: 250,
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                          crossAxisAlignment: CrossAxisAlignment.end,
+                                          children: List.generate(7, (index) {
+                                            final sum = dailySums[index];
+                                            final label = dailyLabels[index];
+                                            final factor = maxDailySum > 0 ? sum / maxDailySum : 0.0;
+                                            return _buildMockBar(label, factor, _formatCurrency(sum));
+                                          }),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
-                              const Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text('Total', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-                                  Text('R\$ 53.950', style: TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
-                                ],
+                              const SizedBox(width: 20),
+                              // Pie Chart (Distribuição de Status)
+                              Expanded(
+                                flex: 1,
+                                child: PremiumCard(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text('Distribuição de Status das Diárias', style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold)),
+                                      const Text('Em relação ao total dos últimos 7 dias', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                                      const SizedBox(height: 40),
+                                      SizedBox(
+                                        height: 250,
+                                        child: Center(
+                                          child: Stack(
+                                            alignment: Alignment.center,
+                                            children: [
+                                              SizedBox(
+                                                width: 160,
+                                                height: 160,
+                                                child: CircularProgressIndicator(
+                                                  value: pieProgressVal,
+                                                  strokeWidth: 24,
+                                                  backgroundColor: Colors.orange.withOpacity(0.2),
+                                                  valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryBlue),
+                                                ),
+                                              ),
+                                              Column(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  const Text('Total', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                                                  Text(_formatCurrency(totalPie), style: const TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 20),
+                                      _buildLegendItem('Pagas', '${_formatCurrency(paid7Days)} (${totalPie > 0 ? (paid7Days / totalPie * 100).toStringAsFixed(1).replaceAll('.', ',') : '0,0'}%)', AppColors.primaryBlue),
+                                      const SizedBox(height: 8),
+                                      _buildLegendItem('Pendentes', '${_formatCurrency(pending7Days)} (${totalPie > 0 ? (pending7Days / totalPie * 100).toStringAsFixed(1).replaceAll('.', ',') : '0,0'}%)', Colors.orange),
+                                    ],
+                                  ),
+                                ),
                               ),
                             ],
                           ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      _buildLegendItem('Pagas', 'R\$ 45.200 (83,8%)', AppColors.primaryBlue),
-                      const SizedBox(height: 8),
-                      _buildLegendItem('Pendentes', 'R\$ 8.750 (16,2%)', Colors.orange),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 32),
+                          const SizedBox(height: 32),
 
-          // Row for Tables and Line Chart
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Ranking de Lojas
-              Expanded(
-                child: PremiumCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Ranking de Lojas (por valor pago)', style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 20),
-                      _buildTableRow('1', 'Loja Centro', 'R\$ 9.850', '+18,6%'),
-                      _buildTableRow('2', 'Loja Norte', 'R\$ 8.420', '+12,3%'),
-                      _buildTableRow('3', 'Loja Sul', 'R\$ 7.240', '-3,2%'),
-                      _buildTableRow('4', 'Loja Leste', 'R\$ 6.890', '+5,7%'),
-                      _buildTableRow('5', 'Loja Oeste', 'R\$ 5.800', '+9,1%'),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 20),
-              // Top Promotores
-              Expanded(
-                child: PremiumCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Top Promotores (por valor pago)', style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 20),
-                      _buildPromoterRow('João Silva', '18 Diárias', 'R\$ 4.650'),
-                      _buildPromoterRow('Maria Santos', '16 Diárias', 'R\$ 4.120'),
-                      _buildPromoterRow('Carlos Lima', '14 Diárias', 'R\$ 3.850'),
-                      _buildPromoterRow('Ana Oliveira', '12 Diárias', 'R\$ 3.200'),
-                      _buildPromoterRow('Pedro Costa', '11 Diárias', 'R\$ 2.950'),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 20),
-              // Taxa de Validação (Line Chart Mock)
-              Expanded(
-                child: PremiumCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Taxa de Validação', style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold)),
-                      const Text('Evolução da taxa de aprovação', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-                      const SizedBox(height: 30),
-                      SizedBox(
-                        height: 150,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            _buildMockLinePoint('88,0%', 0.6),
-                            _buildMockLinePoint('87,5%', 0.55),
-                            _buildMockLinePoint('85,2%', 0.4),
-                            _buildMockLinePoint('90,1%', 0.75),
-                            _buildMockLinePoint('91,3%', 0.8),
-                            _buildMockLinePoint('92,0%', 0.85),
-                            _buildMockLinePoint('92,6%', 0.9),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      const Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('Sex 10/05', style: TextStyle(color: AppColors.textSecondary, fontSize: 10)),
-                          Text('Qui 16/05', style: TextStyle(color: AppColors.textSecondary, fontSize: 10)),
+                          // Row for Tables and Line Chart
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Ranking de Lojas
+                              Expanded(
+                                child: PremiumCard(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text('Ranking de Lojas (por valor pago)', style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold)),
+                                      const SizedBox(height: 20),
+                                      if (sortedStores.isEmpty)
+                                        const Padding(
+                                          padding: EdgeInsets.symmetric(vertical: 20.0),
+                                          child: Center(child: Text('Nenhum dado de pagamento disponível', style: TextStyle(color: AppColors.textSecondary))),
+                                        )
+                                      else
+                                        ...List.generate(sortedStores.take(5).length, (index) {
+                                          final entry = sortedStores[index];
+                                          final storeName = entry.key;
+                                          final totalValue = entry.value;
+
+                                          final currentWeek = storeCurrentWeekPaid[storeName] ?? 0.0;
+                                          final previousWeek = storePreviousWeekPaid[storeName] ?? 0.0;
+
+                                          String variationStr = '+0,0%';
+                                          if (previousWeek == 0.0) {
+                                            if (currentWeek > 0.0) {
+                                              variationStr = '+100,0%';
+                                            }
+                                          } else {
+                                            final varPercent = ((currentWeek - previousWeek) / previousWeek) * 100;
+                                            final formatted = varPercent.toStringAsFixed(1).replaceAll('.', ',');
+                                            variationStr = varPercent >= 0 ? '+$formatted%' : '$formatted%';
+                                          }
+
+                                          return _buildTableRow('${index + 1}', storeName, _formatCurrency(totalValue), variationStr);
+                                        }),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 20),
+                              // Top Promotores
+                              Expanded(
+                                child: PremiumCard(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text('Top Promotores (por valor pago)', style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold)),
+                                      const SizedBox(height: 20),
+                                      if (sortedPromoters.isEmpty)
+                                        const Padding(
+                                          padding: EdgeInsets.symmetric(vertical: 20.0),
+                                          child: Center(child: Text('Nenhum dado de pagamento disponível', style: TextStyle(color: AppColors.textSecondary))),
+                                        )
+                                      else
+                                        ...List.generate(sortedPromoters.take(5).length, (index) {
+                                          final entry = sortedPromoters[index];
+                                          final cpf = entry.key;
+                                          final totalValue = entry.value;
+                                          final count = promoterPaidCount[cpf] ?? 0;
+                                          
+                                          // Resolve promoter name
+                                          final promoterName = promoterNames[cpf] ?? 'Promotor (${cpf.substring(0, cpf.length.clamp(0, 3))}...)';
+
+                                          return _buildPromoterRow(promoterName, '$count ${count == 1 ? 'Diária' : 'Diárias'}', _formatCurrency(totalValue));
+                                        }),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 20),
+                              // Taxa de Validação (Line Chart)
+                              Expanded(
+                                child: PremiumCard(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text('Taxa de Validação', style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold)),
+                                      const Text('Evolução da taxa de aprovação', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                                      const SizedBox(height: 30),
+                                      SizedBox(
+                                        height: 150,
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                          crossAxisAlignment: CrossAxisAlignment.end,
+                                          children: List.generate(7, (index) {
+                                            final rateStr = dailyValidationRates[index];
+                                            final factor = dailyRateFactors[index];
+                                            return _buildMockLinePoint(rateStr, factor);
+                                          }),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 10),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(dailyLabels.first, style: const TextStyle(color: AppColors.textSecondary, fontSize: 10)),
+                                          Text(dailyLabels.last, style: const TextStyle(color: AppColors.textSecondary, fontSize: 10)),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ],
                       ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+                    );
+                  },
+                );
+              },
+            );
+          },
+        );
+      },
     );
   }
 
@@ -469,9 +710,9 @@ class BIContent extends StatelessWidget {
         Container(
           width: 30,
           height: 150 * heightFactor,
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             color: AppColors.primaryBlue,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(4)),
           ),
         ),
         const SizedBox(height: 8),
@@ -567,7 +808,6 @@ class BIContent extends StatelessWidget {
     );
   }
 }
-
 
 class GenericModule extends StatelessWidget {
   final String title;
