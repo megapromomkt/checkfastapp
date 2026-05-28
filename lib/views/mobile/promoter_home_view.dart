@@ -43,6 +43,7 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
   bool _isLoadingDemands = true;
   Map<String, String> _appliedDemandStatuses = {};
   bool _isBlocked = false;
+  int _checkInTabKeyVersion = 0;
 
   int _opportunityCount = 12;
   
@@ -908,90 +909,252 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (context) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Alertas e Questionários Pendentes',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              if (pendingDemands.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
-                  child: Center(
-                    child: Text(
-                      'Tudo em dia! Nenhum questionário pendente.',
-                      style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-                    ),
-                  ),
-                )
-              else
-                Flexible(
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: pendingDemands.length,
-                    itemBuilder: (ctx, idx) {
-                      final d = pendingDemands[idx];
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: const BorderSide(color: AppColors.cardBorder)),
-                        elevation: 0,
-                        color: AppColors.background,
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          leading: const CircleAvatar(
-                            backgroundColor: Colors.amberAccent,
-                            child: Icon(Icons.assignment_turned_in, color: Colors.amber),
-                          ),
-                          title: Text(
-                            d.storeName,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
-                          ),
-                          subtitle: Text(
-                            'Questionário pendente para aceitar a vaga de ${d.role}.',
-                            style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                          ),
-                          trailing: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primaryBlue,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return DefaultTabController(
+              length: 2,
+              child: Container(
+                height: MediaQuery.of(context).size.height * 0.75,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                padding: const EdgeInsets.all(20),
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('notifications')
+                      .where('recipientCpf', isEqualTo: _userCpf)
+                      .orderBy('createdAt', descending: true)
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    final docs = snapshot.data?.docs ?? [];
+                    
+                    final activeNotifications = docs.where((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      return data['dismissed'] != true;
+                    }).toList();
+
+                    final historyNotifications = docs.where((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      return data['dismissed'] == true;
+                    }).toList();
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Central de Alertas',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                             ),
-                            onPressed: () {
-                              Navigator.pop(context); // fechar bottomsheet
-                              DemandOnboardingFlow.show(
-                                context,
-                                demand: d,
-                                userCpf: _userCpf,
-                              ).then((_) {
-                                _updateOpportunityCount();
-                              });
-                            },
-                            child: const Text('RESPONDER', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
+                            IconButton(
+                              icon: const Icon(Icons.close),
+                              onPressed: () => Navigator.pop(context),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        const TabBar(
+                          labelColor: AppColors.primaryBlue,
+                          unselectedLabelColor: AppColors.textSecondary,
+                          indicatorColor: AppColors.primaryBlue,
+                          tabs: [
+                            Tab(text: 'Novas / Pendentes'),
+                            Tab(text: 'Histórico'),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Expanded(
+                          child: TabBarView(
+                            children: [
+                              _buildActiveNotificationsList(activeNotifications, pendingDemands),
+                              _buildHistoryNotificationsList(historyNotifications),
+                            ],
                           ),
                         ),
-                      );
-                    },
-                  ),
+                      ],
+                    );
+                  }
                 ),
-            ],
+              ),
+            );
+          }
+        );
+      }
+    );
+  }
+
+  Widget _buildActiveNotificationsList(List<QueryDocumentSnapshot> notifications, List<AppDemand> pendingDemands) {
+    if (notifications.isEmpty && pendingDemands.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 24),
+          child: Text(
+            'Tudo em dia! Nenhuma notificação pendente.',
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+          ),
+        ),
+      );
+    }
+
+    return ListView(
+      children: [
+        ...notifications.map((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          final String title = data['title'] ?? 'Alerta';
+          final String message = data['message'] ?? '';
+          final String type = data['type'] ?? '';
+          
+          Color iconBg = Colors.blue.withOpacity(0.1);
+          Color iconColor = AppColors.primaryBlue;
+          IconData icon = IconsaxPlusLinear.notification;
+          
+          if (type == 'aprovado') {
+            iconBg = AppColors.success.withOpacity(0.1);
+            iconColor = AppColors.success;
+            icon = Icons.check_circle_outline;
+          } else if (type == 'nao_aprovado') {
+            iconBg = AppColors.error.withOpacity(0.1);
+            iconColor = AppColors.error;
+            icon = Icons.error_outline;
+          }
+
+          return Card(
+            margin: const EdgeInsets.only(bottom: 10),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: const BorderSide(color: AppColors.cardBorder)),
+            elevation: 0,
+            color: AppColors.background,
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              leading: CircleAvatar(
+                backgroundColor: iconBg,
+                child: Icon(icon, color: iconColor),
+              ),
+              title: Text(
+                title,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
+              ),
+              subtitle: Text(
+                message,
+                style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+              ),
+              trailing: IconButton(
+                icon: const Icon(Icons.close, size: 18, color: AppColors.textSecondary),
+                onPressed: () async {
+                  await FirebaseFirestore.instance.collection('notifications').doc(doc.id).update({
+                    'dismissed': true,
+                    'read': true,
+                  });
+                },
+              ),
+            ),
+          );
+        }).toList(),
+
+        ...pendingDemands.map((d) {
+          return Card(
+            margin: const EdgeInsets.only(bottom: 10),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: const BorderSide(color: AppColors.cardBorder)),
+            elevation: 0,
+            color: AppColors.background,
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              leading: const CircleAvatar(
+                backgroundColor: Colors.amberAccent,
+                child: Icon(Icons.assignment_turned_in, color: Colors.amber),
+              ),
+              title: Text(
+                d.storeName,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
+              ),
+              subtitle: Text(
+                'Questionário pendente para aceitar a vaga de ${d.role}.',
+                style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+              ),
+              trailing: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryBlue,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  minimumSize: Size.zero,
+                ),
+                onPressed: () {
+                  Navigator.pop(context);
+                  DemandOnboardingFlow.show(
+                    context,
+                    demand: d,
+                    userCpf: _userCpf,
+                  ).then((_) {
+                    _updateOpportunityCount();
+                  });
+                },
+                child: const Text('RESPONDER', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
+              ),
+            ),
+          );
+        }).toList(),
+      ],
+    );
+  }
+
+  Widget _buildHistoryNotificationsList(List<QueryDocumentSnapshot> notifications) {
+    if (notifications.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 24),
+          child: Text(
+            'Nenhuma notificação no histórico.',
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+          ),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      itemCount: notifications.length,
+      itemBuilder: (context, idx) {
+        final doc = notifications[idx];
+        final data = doc.data() as Map<String, dynamic>;
+        final String title = data['title'] ?? 'Alerta';
+        final String message = data['message'] ?? '';
+        final String type = data['type'] ?? '';
+        
+        Color iconBg = Colors.blue.withOpacity(0.1);
+        Color iconColor = AppColors.primaryBlue;
+        IconData icon = IconsaxPlusLinear.notification;
+        
+        if (type == 'aprovado') {
+          iconBg = AppColors.success.withOpacity(0.1);
+          iconColor = AppColors.success;
+          icon = Icons.check_circle_outline;
+        } else if (type == 'nao_aprovado') {
+          iconBg = AppColors.error.withOpacity(0.1);
+          iconColor = AppColors.error;
+          icon = Icons.error_outline;
+        }
+
+        return Card(
+          margin: const EdgeInsets.only(bottom: 10),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: const BorderSide(color: AppColors.cardBorder)),
+          elevation: 0,
+          color: AppColors.background.withOpacity(0.5),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            leading: CircleAvatar(
+              backgroundColor: iconBg.withOpacity(0.05),
+              child: Icon(icon, color: iconColor.withOpacity(0.5)),
+            ),
+            title: Text(
+              title,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textSecondary),
+            ),
+            subtitle: Text(
+              message,
+              style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+            ),
           ),
         );
       },
@@ -1064,23 +1227,35 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
               Builder(
                 builder: (context) {
                   final pendingDemands = _realDemands.where((d) => d.status == 'ABERTAS' && !_appliedDemandStatuses.containsKey(d.id)).toList();
-                  return InkWell(
-                    onTap: () => _showNotificationsBottomSheet(context, pendingDemands),
-                    borderRadius: BorderRadius.circular(12),
-                    child: Badge(
-                      isLabelVisible: pendingDemands.isNotEmpty,
-                      label: Text('${pendingDemands.length}'),
-                      backgroundColor: Colors.red,
-                      child: Container(
-                        padding: EdgeInsets.all(mobile ? 8 : 12),
-                        decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.cardBorder),
+                  return StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('notifications')
+                        .where('recipientCpf', isEqualTo: _userCpf)
+                        .where('dismissed', isEqualTo: false)
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      final activeNotifsCount = snapshot.data?.docs.length ?? 0;
+                      final totalCount = pendingDemands.length + activeNotifsCount;
+
+                      return InkWell(
+                        onTap: () => _showNotificationsBottomSheet(context, pendingDemands),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Badge(
+                          isLabelVisible: totalCount > 0,
+                          label: Text('$totalCount'),
+                          backgroundColor: Colors.red,
+                          child: Container(
+                            padding: EdgeInsets.all(mobile ? 8 : 12),
+                            decoration: BoxDecoration(
+                              color: AppColors.surface,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppColors.cardBorder),
+                            ),
+                            child: Icon(IconsaxPlusLinear.notification, color: AppColors.textPrimary, size: mobile ? 20 : 24),
+                          ),
                         ),
-                        child: Icon(IconsaxPlusLinear.notification, color: AppColors.textPrimary, size: mobile ? 20 : 24),
-                      ),
-                    ),
+                      );
+                    }
                   );
                 }
               ),
@@ -1761,17 +1936,143 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
 
   // 3. TELA TAREFAS
   Widget _buildTarefasTab(bool isDesktop) {
-    return _buildListTab(
-      isDesktop,
-      'MINHAS TAREFAS', 
-      'Acompanhe suas tarefas e status de execução.', 
-      []
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('applications')
+          .where('promoterCpf', isEqualTo: _userCpf)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator(color: AppColors.primaryBlue));
+        }
+        final docs = snapshot.data?.docs ?? [];
+        
+        final taskApps = docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          final status = data['status'] ?? '';
+          return status == 'tarefa_aprovada' ||
+              status == 'em_andamento' ||
+              status == 'em_analise' ||
+              status == 'liberado_pagamento' ||
+              status == 'pago' ||
+              status == 'nao_aprovada';
+        }).toList();
+
+        final List<Widget> children = [];
+        for (var appDoc in taskApps) {
+          final appData = appDoc.data() as Map<String, dynamic>;
+          final String storeName = appData['storeName'] ?? '';
+          final String network = appData['network'] ?? '';
+          final String role = appData['role'] ?? 'Promotor';
+          final String date = appData['date'] ?? '';
+          final String timeRange = appData['timeRange'] ?? '';
+          final double value = (appData['value'] ?? 0.0).toDouble();
+          final String status = appData['status'] ?? '';
+          
+          Color statusColor = AppColors.primaryBlue;
+          String statusLabel = 'AGENDADO';
+          if (status == 'em_andamento') {
+            statusColor = AppColors.warning;
+            statusLabel = 'EM ANDAMENTO';
+          } else if (status == 'em_analise') {
+            statusColor = Colors.purple;
+            statusLabel = 'EM ANÁLISE';
+          } else if (status == 'liberado_pagamento') {
+            statusColor = AppColors.success;
+            statusLabel = 'LIBERADO';
+          } else if (status == 'pago') {
+            statusColor = AppColors.success;
+            statusLabel = 'PAGO';
+          } else if (status == 'nao_aprovada') {
+            statusColor = AppColors.error;
+            statusLabel = 'NÃO APROVADO';
+          }
+
+          children.add(
+            Padding(
+              padding: const EdgeInsets.only(bottom: 15),
+              child: PremiumCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(storeName, style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w800, fontSize: 17)),
+                              Text(network, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(100)),
+                          child: Text(statusLabel, style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(appData['address'] ?? 'Endereço não informado', style: const TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildSimpleInfo(IconsaxPlusLinear.calendar_1, date),
+                        _buildSimpleInfo(IconsaxPlusLinear.briefcase, role),
+                        _buildSimpleInfo(IconsaxPlusLinear.timer_1, timeRange),
+                      ],
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20),
+                      child: Divider(color: AppColors.cardBorder, height: 1),
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('R\$ ${value.toStringAsFixed(2)}', style: const TextStyle(color: AppColors.success, fontWeight: FontWeight.w900, fontSize: 22, letterSpacing: -0.5)),
+                        ElevatedButton(
+                          onPressed: () {
+                            setState(() {
+                              _checkInTabKeyVersion++;
+                              _selectedIndex = 3;
+                            });
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryBlue,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          ),
+                          child: const Text('EXECUTAR TAREFA', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
+        return _buildListTab(
+          isDesktop,
+          'MINHAS TAREFAS',
+          'Acompanhe suas tarefas e status de execução.',
+          children,
+        );
+      },
     );
   }
 
   // 4. TELA CHECK-IN (CRÍTICA)
   Widget _buildCheckInTab(bool isDesktop) {
-    return CheckInTabView(isDesktop: isDesktop, userCpf: _userCpf);
+    return CheckInTabView(
+      key: ValueKey('checkin_tab_$_checkInTabKeyVersion'),
+      isDesktop: isDesktop,
+      userCpf: _userCpf,
+    );
   }
 
   // 5. RECEBIMENTOS (FINANCEIRO)

@@ -2009,60 +2009,34 @@ class _DemandsManagementViewState extends State<DemandsManagementView> {
                         ),
                       ),
                     ),
-                    if (appStatus == 'inscricao_enviada') ...[
+                    if (appStatus == 'inscricao_enviada' || appStatus == 'tarefa_aprovada' || appStatus == 'nao_aprovada') ...[
                       ElevatedButton(
-                        onPressed: () => _aprovarInscricao(context, appDoc.id, name, demand),
+                        onPressed: appStatus == 'tarefa_aprovada'
+                            ? null
+                            : () => _aprovarInscricao(context, appDoc.id, name, demand),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.success,
-                          foregroundColor: Colors.white,
+                          backgroundColor: appStatus == 'tarefa_aprovada' ? AppColors.success : Colors.white,
+                          foregroundColor: appStatus == 'tarefa_aprovada' ? Colors.white : AppColors.success,
+                          side: appStatus == 'tarefa_aprovada' ? null : const BorderSide(color: AppColors.success),
                           elevation: 0,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
-                        child: const Text('APROVAR & VINCULAR'),
+                        child: const Text('APROVADO'),
                       ),
                       const SizedBox(width: 8),
-                      OutlinedButton(
-                        onPressed: () => _recusarInscricao(context, appDoc.id),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: AppColors.error),
-                          foregroundColor: AppColors.error,
+                      ElevatedButton(
+                        onPressed: appStatus == 'nao_aprovada'
+                            ? null
+                            : () => _recusarInscricao(context, appDoc.id, name, demand),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: appStatus == 'nao_aprovada' ? AppColors.error : Colors.white,
+                          foregroundColor: appStatus == 'nao_aprovada' ? Colors.white : AppColors.error,
+                          side: appStatus == 'nao_aprovada' ? null : const BorderSide(color: AppColors.error),
+                          elevation: 0,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
-                        child: const Text('RECUSAR'),
+                        child: const Text('NÃO APROVADO'),
                       ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: const Icon(Icons.chat_bubble_outline_rounded, color: AppColors.primaryBlue),
-                        onPressed: () => _showSendMessageDialog(context, promoterCpf, name),
-                        tooltip: 'Enviar Mensagem',
-                      ),
-                    ] else if (appStatus == 'tarefa_aprovada') ...[
-                      const Row(
-                        children: [
-                          Icon(Icons.check_circle, color: AppColors.success, size: 16),
-                          SizedBox(width: 6),
-                          Text('Vinculado', style: TextStyle(color: AppColors.success, fontWeight: FontWeight.bold, fontSize: 13)),
-                        ],
-                      ),
-                      const SizedBox(width: 16),
-                      OutlinedButton.icon(
-                        icon: const Icon(Icons.close_rounded, size: 14),
-                        label: const Text('DESVINCULAR'),
-                        onPressed: () => _desvincularPromotor(context, appDoc.id, name, demand),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: AppColors.error),
-                          foregroundColor: AppColors.error,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: const Icon(Icons.chat_bubble_outline_rounded, color: AppColors.primaryBlue),
-                        onPressed: () => _showSendMessageDialog(context, promoterCpf, name),
-                        tooltip: 'Enviar Mensagem',
-                      ),
-                    ] else ...[
-                      Text(appStatus.toUpperCase(), style: const TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold)),
                       const SizedBox(width: 8),
                       IconButton(
                         icon: const Icon(Icons.chat_bubble_outline_rounded, color: AppColors.primaryBlue),
@@ -2299,6 +2273,10 @@ class _DemandsManagementViewState extends State<DemandsManagementView> {
 
   Future<void> _aprovarInscricao(BuildContext context, String applicationId, String promoterName, AppDemand demand) async {
     try {
+      final doc = await FirebaseFirestore.instance.collection('applications').doc(applicationId).get();
+      final currentStatus = doc.data()?['status'] ?? '';
+      if (currentStatus == 'tarefa_aprovada') return;
+
       // 1. Atualiza status da candidatura para tarefa_aprovada
       await FirebaseFirestore.instance.collection('applications').doc(applicationId).update({
         'status': 'tarefa_aprovada',
@@ -2314,6 +2292,20 @@ class _DemandsManagementViewState extends State<DemandsManagementView> {
         'assignedPromoter': promoterName,
         'status': newStatus,
       });
+
+      // 3. Envia notificação para o promotor
+      final String promoterCpf = doc.data()?['promoterCpf'] ?? '';
+      if (promoterCpf.isNotEmpty) {
+        await FirebaseFirestore.instance.collection('notifications').add({
+          'recipientCpf': promoterCpf,
+          'title': 'Candidatura Aprovada! 🎉',
+          'message': 'Você foi aprovado para a diária na loja ${demand.storeName}. Vá em "Minhas Tarefas" para acompanhá-la.',
+          'createdAt': DateTime.now().toIso8601String(),
+          'read': false,
+          'dismissed': false,
+          'type': 'aprovado',
+        });
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('$promoterName vinculado com sucesso!'), backgroundColor: AppColors.success),
@@ -2353,14 +2345,74 @@ class _DemandsManagementViewState extends State<DemandsManagementView> {
     }
   }
 
-  Future<void> _recusarInscricao(BuildContext context, String applicationId) async {
+  Future<void> _recusarInscricao(BuildContext context, String applicationId, String promoterName, AppDemand demand) async {
     try {
+      final doc = await FirebaseFirestore.instance.collection('applications').doc(applicationId).get();
+      final currentStatus = doc.data()?['status'] ?? '';
+      if (currentStatus == 'nao_aprovada') return;
+
+      // 1. Atualiza status da candidatura para nao_aprovada
       await FirebaseFirestore.instance.collection('applications').doc(applicationId).update({
         'status': 'nao_aprovada',
         'updatedAt': DateTime.now().toIso8601String(),
       });
+
+      // 2. Se estava vinculado, retira a vaga preenchida
+      if (currentStatus == 'tarefa_aprovada') {
+        final newFilled = math.max(0, demand.filledVagas - 1);
+        final newStatus = newFilled < demand.totalVagas ? 'ABERTAS' : demand.status;
+        
+        await FirebaseFirestore.instance.collection('demands').doc(demand.id).update({
+          'filledVagas': newFilled,
+          'assignedPromoter': null,
+          'status': newStatus,
+        });
+
+        setState(() {
+          _selectedDemandForVinculo = AppDemand(
+            id: demand.id,
+            clientId: demand.clientId,
+            projectId: demand.projectId,
+            storeId: demand.storeId,
+            roleId: demand.roleId,
+            storeName: demand.storeName,
+            network: demand.network,
+            address: demand.address,
+            role: demand.role,
+            distance: demand.distance,
+            timeRange: demand.timeRange,
+            value: demand.value,
+            date: demand.date,
+            urgency: demand.urgency,
+            status: newStatus,
+            assignedPromoter: null,
+            clientName: demand.clientName,
+            projectName: demand.projectName,
+            totalVagas: demand.totalVagas,
+            filledVagas: newFilled,
+            latitude: demand.latitude,
+            longitude: demand.longitude,
+            questionnaire: demand.questionnaire,
+          );
+        });
+      }
+
+      // 3. Envia notificação para o promotor
+      final String promoterCpf = doc.data()?['promoterCpf'] ?? '';
+      if (promoterCpf.isNotEmpty) {
+        await FirebaseFirestore.instance.collection('notifications').add({
+          'recipientCpf': promoterCpf,
+          'title': 'Candidatura não aprovada ⚠️',
+          'message': 'Sua candidatura para a diária na loja ${demand.storeName} não foi aprovada.',
+          'createdAt': DateTime.now().toIso8601String(),
+          'read': false,
+          'dismissed': false,
+          'type': 'nao_aprovado',
+        });
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Inscrição recusada.'), backgroundColor: AppColors.success),
+        const SnackBar(content: Text('Inscrição recusada (Não Aprovada).'), backgroundColor: AppColors.success),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -3058,47 +3110,54 @@ class _DemandsManagementViewState extends State<DemandsManagementView> {
                                   constraints: const BoxConstraints(),
                                 ),
                                 const SizedBox(width: 12),
-                                if (appStatus == 'inscricao_enviada') ...[
-                                  ElevatedButton(
-                                    onPressed: () => _aprovarInscricao(context, appDoc.id, name, demand),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppColors.success,
-                                      foregroundColor: Colors.white,
-                                      elevation: 0,
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      minimumSize: Size.zero,
-                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                 ElevatedButton(
+                                   onPressed: appStatus == 'tarefa_aprovada'
+                                       ? null
+                                       : () => _aprovarInscricao(context, appDoc.id, name, demand),
+                                   style: ElevatedButton.styleFrom(
+                                     backgroundColor: appStatus == 'tarefa_aprovada' ? AppColors.success : Colors.white,
+                                     foregroundColor: appStatus == 'tarefa_aprovada' ? Colors.white : AppColors.success,
+                                     side: appStatus == 'tarefa_aprovada' ? null : const BorderSide(color: AppColors.success),
+                                     elevation: 0,
+                                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                     minimumSize: Size.zero,
+                                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                   ),
+                                   child: const Text('APROVADO', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                 ),
+                                 const SizedBox(width: 8),
+                                 ElevatedButton(
+                                   onPressed: appStatus == 'nao_aprovada'
+                                       ? null
+                                       : () => _recusarInscricao(context, appDoc.id, name, demand),
+                                   style: ElevatedButton.styleFrom(
+                                     backgroundColor: appStatus == 'nao_aprovada' ? AppColors.error : Colors.white,
+                                     foregroundColor: appStatus == 'nao_aprovada' ? Colors.white : AppColors.error,
+                                     side: appStatus == 'nao_aprovada' ? null : const BorderSide(color: AppColors.error),
+                                     elevation: 0,
+                                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                     minimumSize: Size.zero,
+                                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                   ),
+                                   child: const Text('NÃO APROVADO', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                 ),
+                                 if (appStatus == 'tarefa_aprovada') ...[
+                                    const SizedBox(width: 8),
+                                    OutlinedButton(
+                                      onPressed: () => _desvincularPromotor(context, appDoc.id, name, demand),
+                                      style: OutlinedButton.styleFrom(
+                                        side: const BorderSide(color: AppColors.error),
+                                        foregroundColor: AppColors.error,
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                        minimumSize: Size.zero,
+                                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                      ),
+                                      child: const Text('DESVINCULAR', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                                     ),
-                                    child: const Text('APROVAR', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  OutlinedButton(
-                                    onPressed: () => _recusarInscricao(context, appDoc.id),
-                                    style: OutlinedButton.styleFrom(
-                                      side: const BorderSide(color: AppColors.error),
-                                      foregroundColor: AppColors.error,
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      minimumSize: Size.zero,
-                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                                    ),
-                                    child: const Text('RECUSAR', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                                  ),
-                                ] else if (appStatus == 'tarefa_aprovada') ...[
-                                  OutlinedButton(
-                                    onPressed: () => _desvincularPromotor(context, appDoc.id, name, demand),
-                                    style: OutlinedButton.styleFrom(
-                                      side: const BorderSide(color: AppColors.error),
-                                      foregroundColor: AppColors.error,
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      minimumSize: Size.zero,
-                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                                    ),
-                                    child: const Text('DESVINCULAR', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                                  ),
-                                ],
+                                 ],
                               ],
                             ),
                           ],
