@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/constants/premium_theme.dart';
 import '../../core/services/register_service.dart';
 import '../../models/register_models.dart';
+import '../../models/app_models.dart';
 import 'package:excel/excel.dart' as exc;
 import 'dart:html' as html;
 import 'package:intl/intl.dart';
@@ -25,6 +27,13 @@ class _ReportsViewState extends State<ReportsView> {
   List<AppEPIDelivery> _filteredDeliveries = [];
   List<AppBandeira> _bandeiras = [];
   List<AppStore> _stores = [];
+  
+  // Relatório de Demandas
+  List<AppDemand> _demands = [];
+  List<AppDemand> _filteredDemands = [];
+  List<Map<String, dynamic>> _applications = [];
+  Map<String, String> _promoterNames = {};
+  
   bool _loading = true;
 
   // Filtros
@@ -58,10 +67,32 @@ class _ReportsViewState extends State<ReportsView> {
       final stores = await _api.getStores();
       final deliveries = await _api.getEPIDeliveries();
       
+      // Load Demands
+      final demandsSnapshot = await FirebaseFirestore.instance.collection('demands').get();
+      final demands = demandsSnapshot.docs.map((doc) => AppDemand.fromMap(doc.data()..['id'] = doc.id)).toList();
+
+      // Load Applications
+      final appsSnapshot = await FirebaseFirestore.instance.collection('applications').get();
+      final applications = appsSnapshot.docs.map((doc) => doc.data() as Map<String, dynamic>).toList();
+
+      // Load Promoter users to resolve names
+      final usersSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where('type', isEqualTo: 'prestador')
+          .get();
+      final Map<String, String> promoterNames = {};
+      for (var doc in usersSnapshot.docs) {
+        final data = doc.data();
+        promoterNames[doc.id] = data['name'] ?? '';
+      }
+
       setState(() {
         _bandeiras = bandeiras;
         _stores = stores;
         _deliveries = deliveries;
+        _demands = demands;
+        _applications = applications;
+        _promoterNames = promoterNames;
         _applyFilters();
       });
     } catch (e) {
@@ -90,6 +121,29 @@ class _ReportsViewState extends State<ReportsView> {
         }
         
         return matchesBandeira && matchesStore && matchesEPI && matchesDate;
+      }).toList();
+
+      _filteredDemands = _demands.where((d) {
+        final matchesStore = _filterStoreId == 'Todas' || d.storeId == _filterStoreId;
+        
+        bool matchesBandeira = true;
+        if (_filterBandeiraId != 'Todas') {
+          final store = _stores.firstWhere((s) => s.id == d.storeId, orElse: () => AppStore(id: '', name: '', clientId: '', bandeiraId: ''));
+          matchesBandeira = store.bandeiraId == _filterBandeiraId;
+        }
+
+        bool matchesDate = true;
+        if (_filterDateRange != null) {
+          try {
+            final date = DateFormat('dd/MM/yyyy').parse(d.date);
+            matchesDate = date.isAfter(_filterDateRange!.start.subtract(const Duration(days: 1))) &&
+                          date.isBefore(_filterDateRange!.end.add(const Duration(days: 1)));
+          } catch (_) {
+            matchesDate = false;
+          }
+        }
+
+        return matchesStore && matchesBandeira && matchesDate;
       }).toList();
     });
   }
@@ -132,6 +186,62 @@ class _ReportsViewState extends State<ReportsView> {
             exc.IntCellValue(d.quantity),
           ]);
         }
+      } else if (_selectedReportType == 'Demandas') {
+        exc.Sheet sheetObject = excel['Demandas e Prestadores'];
+        excel.setDefaultSheet('Demandas e Prestadores');
+
+        // Adicionar cabeçalho
+        sheetObject.appendRow([
+          exc.TextCellValue('Loja'),
+          exc.TextCellValue('Rede/Bandeira'),
+          exc.TextCellValue('Cargo/Função'),
+          exc.TextCellValue('Data'),
+          exc.TextCellValue('Valor Diária'),
+          exc.TextCellValue('Total Vagas'),
+          exc.TextCellValue('Vagas Preenchidas'),
+          exc.TextCellValue('Prestador Vinculado'),
+          exc.TextCellValue('CPF do Prestador'),
+          exc.TextCellValue('Status do Vínculo'),
+        ]);
+
+        // Adicionar dados
+        for (var d in _filteredDemands) {
+          final demandApps = _applications.where((app) => app['demandId'] == d.id).toList();
+
+          if (demandApps.isEmpty) {
+            sheetObject.appendRow([
+              exc.TextCellValue(d.storeName),
+              exc.TextCellValue(d.network),
+              exc.TextCellValue(d.role),
+              exc.TextCellValue(d.date),
+              exc.DoubleCellValue(d.value),
+              exc.IntCellValue(d.totalVagas),
+              exc.IntCellValue(d.filledVagas),
+              exc.TextCellValue('Nenhum'),
+              exc.TextCellValue(''),
+              exc.TextCellValue(''),
+            ]);
+          } else {
+            for (var app in demandApps) {
+              final cpf = app['promoterCpf'] ?? '';
+              final name = _promoterNames[cpf] ?? 'CPF: $cpf';
+              final status = app['status'] ?? 'pendente';
+
+              sheetObject.appendRow([
+                exc.TextCellValue(d.storeName),
+                exc.TextCellValue(d.network),
+                exc.TextCellValue(d.role),
+                exc.TextCellValue(d.date),
+                exc.DoubleCellValue(d.value),
+                exc.IntCellValue(d.totalVagas),
+                exc.IntCellValue(d.filledVagas),
+                exc.TextCellValue(name),
+                exc.TextCellValue(cpf),
+                exc.TextCellValue(status.toUpperCase()),
+              ]);
+            }
+          }
+        }
       }
 
       // Codificar e descarregar arquivo
@@ -141,7 +251,9 @@ class _ReportsViewState extends State<ReportsView> {
         final url = html.Url.createObjectUrlFromBlob(blob);
         final fileName = _selectedReportType == 'Entrega de EPI'
             ? 'Relatorio_Entrega_EPI_${DateFormat('dd-MM-yyyy').format(DateTime.now())}.xlsx'
-            : 'Relatorio_${DateFormat('dd-MM-yyyy').format(DateTime.now())}.xlsx';
+            : _selectedReportType == 'Demandas'
+                ? 'Relatorio_Demandas_e_Prestadores_${DateFormat('dd-MM-yyyy').format(DateTime.now())}.xlsx'
+                : 'Relatorio_${DateFormat('dd-MM-yyyy').format(DateTime.now())}.xlsx';
             
         final anchor = html.AnchorElement(href: url)
           ..setAttribute("download", fileName)
@@ -219,7 +331,9 @@ class _ReportsViewState extends State<ReportsView> {
                   ? const Center(child: CircularProgressIndicator(color: AppColors.primaryBlue))
                   : _selectedReportType == 'Entrega de EPI'
                       ? _buildEPIDeliveryReportContent()
-                      : _buildUnderConstructionContent(),
+                      : _selectedReportType == 'Demandas'
+                          ? _buildDemandsReportContent()
+                          : _buildUnderConstructionContent(),
             ),
           ],
         ),
@@ -259,6 +373,7 @@ class _ReportsViewState extends State<ReportsView> {
                 style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 14),
                 items: const [
                   DropdownMenuItem(value: 'Entrega de EPI', child: Text('Relatório de Entrega de EPI')),
+                  DropdownMenuItem(value: 'Demandas', child: Text('Relatório de Demandas e Prestadores')),
                   DropdownMenuItem(value: 'Auditoria de Fotos', child: Text('Auditoria de Fotos e Gôndolas (Em breve)')),
                   DropdownMenuItem(value: 'Produtividade de Rotas', child: Text('Produtividade e Rotas de Promotores (Em breve)')),
                 ],
@@ -941,6 +1056,355 @@ class _ReportsViewState extends State<ReportsView> {
           },
         );
       },
+    );
+  }
+
+  Widget _buildDemandsReportContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Linha de Ferramentas (Toolbar)
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Demandas e Prestadores (${_filteredDemands.length} demandas)',
+              style: const TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.w800),
+            ),
+            OutlinedButton.icon(
+              onPressed: _exportToXLS,
+              icon: const Icon(IconsaxPlusLinear.document_download, size: 18),
+              label: const Text('Exportar em XLS'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primaryBlue,
+                side: const BorderSide(color: AppColors.primaryBlue),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        
+        // Seção de Filtros
+        _buildDemandsFilters(),
+        const SizedBox(height: 20),
+        
+        // Tabela Visual
+        Expanded(
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.cardBorder),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.01),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                )
+              ]
+            ),
+            child: Column(
+              children: [
+                // Cabeçalhos
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  decoration: const BoxDecoration(
+                    color: AppColors.background,
+                    borderRadius: BorderRadius.only(topLeft: Radius.circular(12), topRight: Radius.circular(12)),
+                  ),
+                  child: Row(
+                    children: const [
+                      Expanded(flex: 3, child: Text('LOJA / DEMANDA', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textSecondary, fontSize: 11, letterSpacing: 0.5))),
+                      Expanded(flex: 2, child: Text('FUNÇÃO / DATA', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textSecondary, fontSize: 11, letterSpacing: 0.5))),
+                      Expanded(flex: 2, child: Text('VALOR / VAGAS', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textSecondary, fontSize: 11, letterSpacing: 0.5))),
+                      Expanded(flex: 5, child: Text('PRESTADORES VINCULADOS (STATUS)', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textSecondary, fontSize: 11, letterSpacing: 0.5))),
+                    ],
+                  ),
+                ),
+                
+                // Registros
+                Expanded(
+                  child: _filteredDemands.isEmpty
+                      ? const Center(child: Text('Nenhuma demanda encontrada com os filtros atuais.', style: TextStyle(color: AppColors.textSecondary, fontSize: 14)))
+                      : ListView.separated(
+                          itemCount: _filteredDemands.length,
+                          separatorBuilder: (context, index) => const Divider(height: 1, color: AppColors.cardBorder),
+                          itemBuilder: (context, index) {
+                            final d = _filteredDemands[index];
+                            
+                            // Find applications for this demand
+                            final demandApps = _applications.where((app) => app['demandId'] == d.id).toList();
+
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Loja / Demanda
+                                  Expanded(
+                                    flex: 3,
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          d.storeName,
+                                          style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary, fontSize: 13),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          d.network,
+                                          style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  // Função / Data
+                                  Expanded(
+                                    flex: 2,
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          d.role,
+                                          style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w600),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          d.date,
+                                          style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  // Valor / Vagas
+                                  Expanded(
+                                    flex: 2,
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'R\$ ${d.value.toStringAsFixed(2)}',
+                                          style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.success, fontSize: 13),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'Vagas: ${d.filledVagas}/${d.totalVagas}',
+                                          style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  // Prestadores Vinculados
+                                  Expanded(
+                                    flex: 5,
+                                    child: demandApps.isEmpty
+                                        ? const Text(
+                                            'Nenhum prestador vinculado',
+                                            style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontStyle: FontStyle.italic),
+                                          )
+                                        : Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: demandApps.map((app) {
+                                              final cpf = app['promoterCpf'] ?? '';
+                                              final name = _promoterNames[cpf] ?? 'CPF: $cpf';
+                                              final status = app['status'] ?? 'pendente';
+                                              
+                                              // Translate/format status
+                                              Color statusColor = AppColors.textSecondary;
+                                              String statusLabel = status.toUpperCase();
+                                              
+                                              if (status == 'treinamento') {
+                                                statusColor = AppColors.primaryBlue;
+                                                statusLabel = 'TREINAMENTO';
+                                              } else if (status == 'aprovado' || status == 'selecionado') {
+                                                statusColor = AppColors.success;
+                                                statusLabel = 'APROVADO';
+                                              } else if (status == 'tarefa_aprovada') {
+                                                statusColor = Colors.purple;
+                                                statusLabel = 'DIÁRIA CONCLUÍDA';
+                                              } else if (status == 'rejeitado') {
+                                                statusColor = AppColors.error;
+                                                statusLabel = 'REJEITADO';
+                                              }
+
+                                              return Padding(
+                                                padding: const EdgeInsets.only(bottom: 6),
+                                                child: Row(
+                                                  children: [
+                                                    const Icon(Icons.person_outline, size: 14, color: AppColors.textSecondary),
+                                                    const SizedBox(width: 6),
+                                                    Expanded(
+                                                      child: RichText(
+                                                        text: TextSpan(
+                                                          style: const TextStyle(fontSize: 12, color: AppColors.textPrimary, fontFamily: 'Inter'),
+                                                          children: [
+                                                            TextSpan(text: name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                                                            const TextSpan(text: ' ('),
+                                                            TextSpan(text: statusLabel, style: TextStyle(color: statusColor, fontWeight: FontWeight.bold)),
+                                                            const TextSpan(text: ')'),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                            }).toList(),
+                                          ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDemandsFilters() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              // Bandeira Filter
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('BANDEIRA', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: AppColors.textSecondary)),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.background,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.cardBorder),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _filterBandeiraId,
+                          isExpanded: true,
+                          style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w500),
+                          items: [
+                            const DropdownMenuItem(value: 'Todas', child: Text('Todas as Bandeiras')),
+                            ..._bandeiras.map((b) => DropdownMenuItem(value: b.id, child: Text(b.name))),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) {
+                              setState(() {
+                                _filterBandeiraId = val;
+                                _filterStoreId = 'Todas';
+                                _applyFilters();
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              
+              // Loja Filter
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('LOJA / ESTABELECIMENTO', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: AppColors.textSecondary)),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.background,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.cardBorder),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _filterStoreId,
+                          isExpanded: true,
+                          style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w500),
+                          items: [
+                            const DropdownMenuItem(value: 'Todas', child: Text('Todas as Lojas')),
+                            ..._stores
+                                .where((s) => _filterBandeiraId == 'Todas' || s.bandeiraId == _filterBandeiraId)
+                                .map((s) => DropdownMenuItem(value: s.id, child: Text(s.name))),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) {
+                              setState(() {
+                                _filterStoreId = val;
+                                _applyFilters();
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              
+              // Date Range Filter Button
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('PERÍODO DA DEMANDA', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: AppColors.textSecondary)),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: _showDateRangePicker,
+                      icon: const Icon(IconsaxPlusLinear.calendar_1, size: 16, color: AppColors.textPrimary),
+                      label: Text(
+                        _filterDateRange == null 
+                            ? 'Qualquer data' 
+                            : '${DateFormat('dd/MM').format(_filterDateRange!.start)} - ${DateFormat('dd/MM').format(_filterDateRange!.end)}',
+                        style: const TextStyle(color: AppColors.textPrimary, fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                        side: const BorderSide(color: AppColors.cardBorder),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        backgroundColor: AppColors.background,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          
+          if (_filterBandeiraId != 'Todas' || _filterStoreId != 'Todas' || _filterDateRange != null) ...[
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: _clearFilters,
+                icon: const Icon(Icons.clear_all, size: 16),
+                label: const Text('Limpar Filtros'),
+                style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
+              ),
+            ),
+          ]
+        ],
+      ),
     );
   }
 }

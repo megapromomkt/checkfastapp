@@ -19,6 +19,7 @@ import 'settings_view.dart';
 import 'curriculum_search_view.dart';
 import 'reports_view.dart';
 import 'support_dashboard_view.dart';
+import 'admission_letters_view.dart';
 
 class AdminDashboardView extends StatefulWidget {
   const AdminDashboardView({super.key});
@@ -33,7 +34,7 @@ class AdminDashboardViewState extends State<AdminDashboardView> {
   void switchToSupportChat(String cpf) {
     setState(() {
       _initialChatCpf = cpf;
-      _selectedModule = 8; // Index of SupportDashboardView (Mensagens)
+      _selectedModule = 9; // Index of SupportDashboardView (Mensagens)
       _sidebarExpanded = false;
     });
   }
@@ -84,6 +85,7 @@ class AdminDashboardViewState extends State<AdminDashboardView> {
       parsed['Demandas'] = {'visualizar': true, 'criar': false, 'editar': false, 'excluir': false};
       parsed['Presença'] = {'visualizar': true, 'criar': false, 'editar': false, 'excluir': false};
       parsed['Relatórios'] = {'visualizar': true, 'criar': false, 'editar': false, 'excluir': false};
+      parsed['Cartas'] = {'visualizar': true, 'criar': true, 'editar': true, 'excluir': true};
     } else if (lowerRole.contains('rh') || lowerRole.contains('recursos')) {
       parsed['Currículos'] = {'visualizar': true, 'criar': true, 'editar': true, 'excluir': true};
       parsed['Mensagens'] = {'visualizar': true, 'criar': true, 'editar': true, 'excluir': true};
@@ -91,15 +93,18 @@ class AdminDashboardViewState extends State<AdminDashboardView> {
       parsed['Cadastros'] = {'visualizar': true, 'criar': true, 'editar': true, 'excluir': false};
       parsed['Demandas'] = {'visualizar': true, 'criar': true, 'editar': true, 'excluir': false};
       parsed['Relatórios'] = {'visualizar': true, 'criar': true, 'editar': false, 'excluir': false};
+      parsed['Cartas'] = {'visualizar': true, 'criar': true, 'editar': true, 'excluir': true};
     } else if (lowerRole.contains('financeiro')) {
       parsed['Financeiro'] = {'visualizar': true, 'criar': true, 'editar': true, 'excluir': true};
       parsed['Relatórios'] = {'visualizar': true, 'criar': true, 'editar': false, 'excluir': false};
+      parsed['Cartas'] = {'visualizar': true, 'criar': true, 'editar': true, 'excluir': true};
       parsed['Mensagens'] = {'visualizar': true, 'criar': true, 'editar': true, 'excluir': true};
       parsed['Mensagens - Financeiro'] = {'visualizar': true, 'criar': true, 'editar': true, 'excluir': true};
     } else if (lowerRole.contains('trade')) {
       parsed['Demandas'] = {'visualizar': true, 'criar': true, 'editar': true, 'excluir': true};
       parsed['Mensagens'] = {'visualizar': true, 'criar': true, 'editar': true, 'excluir': true};
       parsed['Mensagens - Operacional'] = {'visualizar': true, 'criar': true, 'editar': true, 'excluir': true};
+      parsed['Cartas'] = {'visualizar': true, 'criar': true, 'editar': true, 'excluir': true};
     }
     
     setState(() {
@@ -219,12 +224,13 @@ class AdminDashboardViewState extends State<AdminDashboardView> {
     const PresenceControlView(),
     const FinancialModuleView(),
     const ReportsView(),
+    const AdmissionLettersView(),
     const SupportDashboardView(),
     const SettingsView(),
   ];
 
   Widget _getSelectedModuleWidget() {
-    if (_selectedModule == 8) {
+    if (_selectedModule == 9) {
       return SupportDashboardView(initialChatCpf: _initialChatCpf);
     }
     return _modules[_selectedModule];
@@ -475,8 +481,9 @@ class AdminDashboardViewState extends State<AdminDashboardView> {
                     _buildMenuItem(context, 5, IconsaxPlusLinear.radar, 'Presença', unreadMessagesCount, drawer: drawer),
                     _buildMenuItem(context, 6, IconsaxPlusLinear.wallet_check, 'Financeiro', unreadMessagesCount, drawer: drawer),
                     _buildMenuItem(context, 7, IconsaxPlusLinear.document_text, 'Relatórios', unreadMessagesCount, drawer: drawer),
-                    _buildMenuItem(context, 8, IconsaxPlusLinear.message_2, 'Mensagens', unreadMessagesCount, drawer: drawer),
-                    _buildMenuItem(context, 9, IconsaxPlusLinear.setting_4, 'Configurações', unreadMessagesCount, drawer: drawer),
+                    _buildMenuItem(context, 8, IconsaxPlusLinear.note_2, 'Cartas', unreadMessagesCount, drawer: drawer),
+                    _buildMenuItem(context, 9, IconsaxPlusLinear.message_2, 'Mensagens', unreadMessagesCount, drawer: drawer),
+                    _buildMenuItem(context, 10, IconsaxPlusLinear.setting_4, 'Configurações', unreadMessagesCount, drawer: drawer),
                   ],
                 ),
               ),
@@ -490,7 +497,7 @@ class AdminDashboardViewState extends State<AdminDashboardView> {
   }
 
   String _moduleLabel(int index) {
-    const labels = ['Liquidez BI', 'Cadastros', 'Usuários', 'Demandas', 'Currículos', 'Presença', 'Financeiro', 'Relatórios', 'Mensagens', 'Configurações'];
+    const labels = ['Liquidez BI', 'Cadastros', 'Usuários', 'Demandas', 'Currículos', 'Presença', 'Financeiro', 'Relatórios', 'Cartas', 'Mensagens', 'Configurações'];
     return index < labels.length ? labels[index] : '';
   }
 
@@ -504,7 +511,7 @@ class AdminDashboardViewState extends State<AdminDashboardView> {
     final bool expanded = drawer || _sidebarExpanded;
 
     Widget leadingIcon = Icon(icon, color: selected ? AppColors.primaryBlue : AppColors.textSecondary, size: 22);
-    if (index == 8 && unreadCount > 0) {
+    if (index == 9 && unreadCount > 0) {
       leadingIcon = Badge(
         label: Text('$unreadCount', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
         backgroundColor: AppColors.error,

@@ -4728,7 +4728,23 @@ class _VacancyChronologyState extends State<VacancyChronology> {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(IconsaxPlusLinear.teacher, color: AppColors.primaryBlue, size: 20),
+                      icon: currentStatus == 'treinamento'
+                          ? Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: const BoxDecoration(
+                                color: AppColors.primaryBlue,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(IconsaxPlusBold.teacher, color: Colors.white, size: 16),
+                            )
+                          : Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: AppColors.primaryBlue.withOpacity(0.08),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(IconsaxPlusLinear.teacher, color: AppColors.primaryBlue, size: 16),
+                            ),
                       tooltip: 'Enviar para Treinamento',
                       onPressed: () async {
                         await _transitionApplicants([app], 'treinamento');
@@ -4741,7 +4757,23 @@ class _VacancyChronologyState extends State<VacancyChronology> {
                       },
                     ),
                     IconButton(
-                      icon: const Icon(Icons.verified_outlined, color: AppColors.success, size: 20),
+                      icon: (currentStatus == 'aprovado' || currentStatus == 'selecionado')
+                          ? Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: const BoxDecoration(
+                                color: AppColors.success,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.verified, color: Colors.white, size: 16),
+                            )
+                          : Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: AppColors.success.withOpacity(0.08),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.verified_outlined, color: AppColors.success, size: 16),
+                            ),
                       tooltip: 'Aprovar Direto (Apto)',
                       onPressed: () async {
                         await _transitionApplicants([app], 'aprovado');
@@ -4821,6 +4853,12 @@ class _VacancyChronologyState extends State<VacancyChronology> {
   }
 
   Widget _buildTreinamentoDetails(int count, List<QueryDocumentSnapshot> apps, Map<String, Map<String, dynamic>> letterMap) {
+    final trainingApps = apps.where((app) {
+      final appData = app.data() as Map<String, dynamic>;
+      final status = appData['status'] ?? '';
+      return status == 'treinamento' || status == 'aprovado' || status == 'selecionado';
+    }).toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -4829,15 +4867,16 @@ class _VacancyChronologyState extends State<VacancyChronology> {
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
         ),
         const SizedBox(height: 16),
-        if (apps.isEmpty)
-          _buildSubEmptyState('Nenhum candidato aguardando treinamento.')
+        if (trainingApps.isEmpty)
+          _buildSubEmptyState('Nenhum candidato em treinamento ou aprovado.')
         else
           SizedBox(
             height: 300,
             child: ListView.builder(
-              itemCount: apps.length,
+              itemCount: trainingApps.length,
               itemBuilder: (context, index) {
-                final appData = apps[index].data() as Map<String, dynamic>;
+                final app = trainingApps[index];
+                final appData = app.data() as Map<String, dynamic>;
                 final String cpf = appData['promoterCpf'] ?? '';
                 final promoter = widget.promoterMap[cpf];
                 if (promoter == null) return const SizedBox.shrink();

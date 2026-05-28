@@ -19,20 +19,24 @@ class ActiveAllocation {
   final String applicationId;
   final AppUser promoter;
   final AppDemand demand;
+  final String status;
 
   ActiveAllocation({
     required this.applicationId,
     required this.promoter,
     required this.demand,
+    required this.status,
   });
 }
 
 class _AdmissionLettersViewState extends State<AdmissionLettersView> {
   bool _loading = true;
   bool _isAutoMode = true;
+  bool _isTrainingModeLetter = true;
 
   List<AppUser> _promoters = [];
   List<AppDemand> _demands = [];
+  List<ActiveAllocation> _allAllocations = [];
   List<ActiveAllocation> _allocations = [];
 
   ActiveAllocation? _selectedAllocation;
@@ -108,17 +112,18 @@ class _AdmissionLettersViewState extends State<AdmissionLettersView> {
       final demandSnapshot = await FirebaseFirestore.instance.collection('demands').get();
       final demands = demandSnapshot.docs.map((doc) => AppDemand.fromMap(doc.data()..['id'] = doc.id)).toList();
 
-      // 3. Fetch Applications with approved tasks
+      // 3. Fetch Applications with relevant statuses
       final appSnapshot = await FirebaseFirestore.instance
           .collection('applications')
-          .where('status', isEqualTo: 'tarefa_aprovada')
+          .where('status', whereIn: ['treinamento', 'tarefa_aprovada', 'aprovado', 'selecionado'])
           .get();
 
-      final List<ActiveAllocation> allocations = [];
+      final List<ActiveAllocation> allAllocations = [];
       for (var doc in appSnapshot.docs) {
         final appData = doc.data();
         final String promoterCpf = appData['promoterCpf'] ?? '';
         final String demandId = appData['demandId'] ?? '';
+        final String status = appData['status'] ?? '';
 
         final promoter = promoters.firstWhere((p) => p.id == promoterCpf, orElse: () => AppUser(id: promoterCpf, name: 'Promotor ($promoterCpf)', email: ''));
         final demand = demands.firstWhere((d) => d.id == demandId, orElse: () => AppDemand(
@@ -135,27 +140,57 @@ class _AdmissionLettersViewState extends State<AdmissionLettersView> {
           status: '',
         ));
 
-        allocations.add(ActiveAllocation(
+        allAllocations.add(ActiveAllocation(
           applicationId: doc.id,
           promoter: promoter,
           demand: demand,
+          status: status,
         ));
       }
 
       setState(() {
         _promoters = promoters;
         _demands = demands;
-        _allocations = allocations;
+        _allAllocations = allAllocations;
         _loading = false;
 
-        if (allocations.isNotEmpty) {
-          _onAllocationSelected(allocations.first);
+        if (_isTrainingModeLetter) {
+          _allocations = _allAllocations.where((alloc) => alloc.status == 'treinamento').toList();
+        } else {
+          _allocations = _allAllocations.where((alloc) => alloc.status == 'tarefa_aprovada' || alloc.status == 'aprovado' || alloc.status == 'selecionado').toList();
+        }
+
+        if (_allocations.isNotEmpty) {
+          _selectedAllocation = _allocations.first;
+          _onAllocationSelected(_allocations.first);
+        } else {
+          _selectedAllocation = null;
         }
       });
     } catch (e) {
       print('Erro ao carregar dados de cartas: $e');
       setState(() => _loading = false);
     }
+  }
+
+  void _updateFilteredAllocations() {
+    setState(() {
+      if (_isTrainingModeLetter) {
+        _allocations = _allAllocations.where((alloc) => alloc.status == 'treinamento').toList();
+      } else {
+        _allocations = _allAllocations.where((alloc) => alloc.status == 'tarefa_aprovada' || alloc.status == 'aprovado' || alloc.status == 'selecionado').toList();
+      }
+
+      if (_allocations.isNotEmpty) {
+        _selectedAllocation = _allocations.first;
+        _onAllocationSelected(_allocations.first);
+      } else {
+        _selectedAllocation = null;
+        _promoterNameController.clear();
+        _promoterCpfController.clear();
+        _promoterRgController.clear();
+      }
+    });
   }
 
   void _onAllocationSelected(ActiveAllocation alloc) {
@@ -223,6 +258,9 @@ class _AdmissionLettersViewState extends State<AdmissionLettersView> {
 
   void _printLetter() {
     final String formattedDate = DateFormat("dd/MM/yyyy").format(DateTime.now());
+    final String activityText = _isTrainingModeLetter
+        ? "Treinamento Obrigatório Frente de Caixa"
+        : "Operações de Frente de Caixa / Diárias de Atendimento";
     
     // Replace newlines with <br> for HTML printing
     final String stampCompanyHtml = _stampCompanyController.text.replaceAll('\n', '<br>');
@@ -379,7 +417,7 @@ class _AdmissionLettersViewState extends State<AdmissionLettersView> {
     <p class="salutation">Prezados Senhores,</p>
   </div>
   <div class="body-content">
-    <p class="indent"><strong>${_companyNameController.text}</strong>, vem por meio desta, comunicar que nosso prestador de serviço Sr. (a) <strong>${_promoterNameController.text}</strong>, registrado com contrato de prestação de serviço e portador (a) do CPF <strong>${_promoterCpfController.text}</strong> devidamente habilitado para o cargo de <strong>${_roleController.text}</strong>, será alocado(a) para realizar as atribuições de <strong>${_roleController.text}</strong>, dentro do estabelecimento acima mencionado.</p>
+    <p class="indent"><strong>${_companyNameController.text}</strong>, vem por meio desta, comunicar que nosso prestador de serviço Sr. (a) <strong>${_promoterNameController.text}</strong>, registrado com contrato de prestação de serviço e portador (a) do CPF <strong>${_promoterCpfController.text}</strong> devidamente habilitado para o cargo de <strong>${_roleController.text}</strong>, será alocado(a) para realizar as atribuições de <strong>$activityText</strong>, dentro do estabelecimento acima mencionado.</p>
     
     <p class="indent">Informamos que o referido prestador de serviço autônomo participou do treinamento referente ao uso do(s) EPI(s) e às Normas de Segurança do Trabalho, e está ciente do uso obrigatório dos Equipamentos de Proteção Individual, conforme Lei n.º 514, de 22/12/77, artigo 157.</p>
     
@@ -428,6 +466,9 @@ class _AdmissionLettersViewState extends State<AdmissionLettersView> {
   @override
   Widget build(BuildContext context) {
     final String formattedDate = DateFormat("dd/MM/yyyy").format(DateTime.now());
+    final String activityText = _isTrainingModeLetter
+        ? "Treinamento Obrigatório Frente de Caixa"
+        : "Operações de Frente de Caixa / Diárias de Atendimento";
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -455,6 +496,25 @@ class _AdmissionLettersViewState extends State<AdmissionLettersView> {
                       )
                     ],
                   ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      _buildTabButton('CARTA DE TREINAMENTO', _isTrainingModeLetter, () {
+                        setState(() {
+                          _isTrainingModeLetter = true;
+                          _updateFilteredAllocations();
+                        });
+                      }),
+                      const SizedBox(width: 12),
+                      _buildTabButton('CARTA DE DIÁRIA (NORMAL)', !_isTrainingModeLetter, () {
+                        setState(() {
+                          _isTrainingModeLetter = false;
+                          _updateFilteredAllocations();
+                        });
+                      }),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
                   Expanded(
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -761,7 +821,7 @@ class _AdmissionLettersViewState extends State<AdmissionLettersView> {
                                             ),
                                             const TextSpan(text: ', será alocado(a) para realizar as atribuições de '),
                                             TextSpan(
-                                              text: _roleController.text.isNotEmpty ? _roleController.text : '[Cargo/Função]',
+                                              text: activityText,
                                               style: const TextStyle(fontWeight: FontWeight.bold),
                                             ),
                                             const TextSpan(text: ', dentro do estabelecimento acima mencionado.'),
@@ -941,6 +1001,39 @@ class _AdmissionLettersViewState extends State<AdmissionLettersView> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildTabButton(String title, bool active, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        decoration: BoxDecoration(
+          color: active ? AppColors.primaryBlue : Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: active ? AppColors.primaryBlue : AppColors.cardBorder),
+          boxShadow: active
+              ? [
+                  BoxShadow(
+                    color: AppColors.primaryBlue.withOpacity(0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  )
+                ]
+              : null,
+        ),
+        child: Text(
+          title,
+          style: TextStyle(
+            color: active ? Colors.white : AppColors.textSecondary,
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ),
     );
   }
 }
