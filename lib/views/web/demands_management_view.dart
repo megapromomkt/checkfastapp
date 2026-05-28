@@ -4221,51 +4221,58 @@ class _VacancyChronologyState extends State<VacancyChronology> {
     html.Url.revokeObjectUrl(url);
   }
 
-  Future<void> _transitionApplicants(List<QueryDocumentSnapshot> appsToTransition, String targetStatus) async {
-    final batch = FirebaseFirestore.instance.batch();
-    int newApprovals = 0;
+  Future<void> _transitionApplicants(BuildContext context, List<QueryDocumentSnapshot> appsToTransition, String targetStatus) async {
+    try {
+      final batch = FirebaseFirestore.instance.batch();
+      int newApprovals = 0;
 
-    for (var app in appsToTransition) {
-      final appData = app.data() as Map<String, dynamic>;
-      final currentStatus = appData['status'] ?? '';
-      final String cpf = appData['promoterCpf'] ?? '';
+      for (var app in appsToTransition) {
+        final appData = app.data() as Map<String, dynamic>;
+        final currentStatus = appData['status'] ?? '';
+        final String cpf = appData['promoterCpf'] ?? '';
 
-      if (currentStatus != targetStatus) {
-        batch.update(app.reference, {'status': targetStatus});
-        if (targetStatus == 'aprovado' && currentStatus != 'aprovado' && currentStatus != 'selecionado') {
-          newApprovals++;
+        if (currentStatus != targetStatus) {
+          batch.update(app.reference, {'status': targetStatus});
+          if (targetStatus == 'aprovado' && currentStatus != 'aprovado' && currentStatus != 'selecionado') {
+            newApprovals++;
+          }
+
+          final promoter = widget.promoterMap[cpf];
+          final promoterName = promoter?['name'] ?? '';
+          final promoterCpfFormatted = promoter?['id'] ?? cpf;
+          final type = targetStatus == 'treinamento' ? 'treinamento' : 'diarias';
+
+          final letterRef = FirebaseFirestore.instance.collection('letters').doc("${widget.demand.id}_${cpf}_$type");
+          batch.set(letterRef, {
+            'demandId': widget.demand.id,
+            'promoterCpf': cpf,
+            'promoterName': promoterName,
+            'promoterCpfFormatted': promoterCpfFormatted,
+            'storeName': widget.demand.storeName,
+            'type': type,
+            'title': type == 'treinamento' ? 'CARTA DE APRESENTAÇÃO - TREINAMENTO' : 'CARTA DE APRESENTAÇÃO - DIÁRIAS',
+            'createdAt': DateTime.now().toIso8601String(),
+            'expiresAt': DateTime.now().add(Duration(days: type == 'treinamento' ? 1 : 3)).toIso8601String(),
+          });
         }
+      }
 
-        final promoter = widget.promoterMap[cpf];
-        final promoterName = promoter?['name'] ?? '';
-        final promoterCpfFormatted = promoter?['id'] ?? cpf;
-        final type = targetStatus == 'treinamento' ? 'treinamento' : 'diarias';
-
-        final letterRef = FirebaseFirestore.instance.collection('letters').doc("${widget.demand.id}_${cpf}_$type");
-        batch.set(letterRef, {
-          'demandId': widget.demand.id,
-          'promoterCpf': cpf,
-          'promoterName': promoterName,
-          'promoterCpfFormatted': promoterCpfFormatted,
-          'storeName': widget.demand.storeName,
-          'type': type,
-          'title': type == 'treinamento' ? 'CARTA DE APRESENTAÇÃO - TREINAMENTO' : 'CARTA DE APRESENTAÇÃO - DIÁRIAS',
-          'createdAt': DateTime.now().toIso8601String(),
-          'expiresAt': DateTime.now().add(Duration(days: type == 'treinamento' ? 1 : 3)).toIso8601String(),
+      if (newApprovals > 0) {
+        final newFilled = (widget.demand.filledVagas + newApprovals).clamp(0, widget.demand.totalVagas);
+        final demandStatus = (newFilled >= widget.demand.totalVagas) ? 'PREENCHIDAS' : widget.demand.status;
+        batch.update(FirebaseFirestore.instance.collection('demands').doc(widget.demand.id), {
+          'filledVagas': newFilled,
+          'status': demandStatus,
         });
       }
-    }
 
-    if (newApprovals > 0) {
-      final newFilled = (widget.demand.filledVagas + newApprovals).clamp(0, widget.demand.totalVagas);
-      final demandStatus = (newFilled >= widget.demand.totalVagas) ? 'PREENCHIDAS' : widget.demand.status;
-      batch.update(FirebaseFirestore.instance.collection('demands').doc(widget.demand.id), {
-        'filledVagas': newFilled,
-        'status': demandStatus,
-      });
+      await batch.commit();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao transicionar candidatos: $e'), backgroundColor: AppColors.error),
+      );
+      rethrow;
     }
-
-    await batch.commit();
   }
 
   @override
@@ -4282,6 +4289,7 @@ class _VacancyChronologyState extends State<VacancyChronology> {
         int bioCount = 0;
         int trainingCompleteCount = 0;
         int approvedCount = 0;
+        int inTrainingCount = 0;
 
         for (var doc in apps) {
           final data = doc.data() as Map<String, dynamic>;
@@ -4290,6 +4298,9 @@ class _VacancyChronologyState extends State<VacancyChronology> {
           
           if (status == 'aprovado' || status == 'selecionado') {
             approvedCount++;
+          }
+          if (status == 'treinamento') {
+            inTrainingCount++;
           }
           final promoter = widget.promoterMap[cpf];
           if (promoter != null) {
@@ -4339,7 +4350,7 @@ class _VacancyChronologyState extends State<VacancyChronology> {
               ),
               _ChronologyStep(
                 title: 'Treinamento Obrigatório',
-                subtitle: '$trainingCompleteCount concluíram o treinamento',
+                subtitle: '$inTrainingCount em treinamento ($trainingCompleteCount concluíram)',
                 icon: IconsaxPlusLinear.teacher,
                 status: trainingCompleteCount > 0 ? _StepStatus.completed : _StepStatus.active,
                 details: _buildTreinamentoDetails(trainingCompleteCount, apps, letterMap),
@@ -4645,7 +4656,7 @@ class _VacancyChronologyState extends State<VacancyChronology> {
                     ? null
                     : () async {
                         final selectedApps = apps.where((app) => _selectedAppIds.contains(app.id)).toList();
-                        await _transitionApplicants(selectedApps, 'treinamento');
+                        await _transitionApplicants(context, selectedApps, 'treinamento');
                         setState(() {
                           _selectedAppIds.clear();
                         });
@@ -4671,7 +4682,7 @@ class _VacancyChronologyState extends State<VacancyChronology> {
                     ? null
                     : () async {
                         final selectedApps = apps.where((app) => _selectedAppIds.contains(app.id)).toList();
-                        await _transitionApplicants(selectedApps, 'aprovado');
+                        await _transitionApplicants(context, selectedApps, 'aprovado');
                         setState(() {
                           _selectedAppIds.clear();
                         });
@@ -4806,7 +4817,7 @@ class _VacancyChronologyState extends State<VacancyChronology> {
                             ),
                       tooltip: 'Enviar para Treinamento',
                       onPressed: () async {
-                        await _transitionApplicants([app], 'treinamento');
+                        await _transitionApplicants(context, [app], 'treinamento');
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text('$name enviado para treinamento (carta de 1 dia gerada).'),
@@ -4835,7 +4846,7 @@ class _VacancyChronologyState extends State<VacancyChronology> {
                             ),
                       tooltip: 'Aprovar Direto (Apto)',
                       onPressed: () async {
-                        await _transitionApplicants([app], 'aprovado');
+                        await _transitionApplicants(context, [app], 'aprovado');
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text('$name aprovado direto (carta de diárias de 3 dias gerada).'),

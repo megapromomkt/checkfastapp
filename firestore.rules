@@ -68,6 +68,16 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
 
+    // Letters (Cartas de Apresentação)
+    match /letters/{letterId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Notifications (Alertas)
+    match /notifications/{notificationId} {
+      allow read, write: if request.auth != null;
+    }
+
     // Support Chats (Chat): Prestadores leem/gravam, Admins/RH gerenciam todas
     match /support_chats/{promoterCpf} {
       allow read, write: if request.auth != null;
