@@ -256,8 +256,37 @@ class _AdmissionLettersViewState extends State<AdmissionLettersView> {
     });
   }
 
-  void _printLetter() {
-    final String formattedDate = DateFormat("dd/MM/yyyy").format(DateTime.now());
+  Future<void> _printLetter() async {
+    final DateTime? pickedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now().subtract(const Duration(days: 30)),
+      lastDate: DateTime.now().add(const Duration(days: 90)),
+      helpText: 'DATA DE EMISSÃO DA CARTA',
+      cancelText: 'CANCELAR',
+      confirmText: 'CONFIRMAR',
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: AppColors.primaryBlue,
+              onPrimary: Colors.white,
+              onSurface: AppColors.textPrimary,
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.primaryBlue,
+              ),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (pickedDate == null) return;
+
+    final String formattedDate = DateFormat("dd/MM/yyyy").format(pickedDate);
     final String activityText = _isTrainingModeLetter
         ? "Treinamento Obrigatório Frente de Caixa"
         : "Operações de Frente de Caixa / Diárias de Atendimento";

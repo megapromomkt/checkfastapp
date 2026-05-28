@@ -847,17 +847,45 @@ class _UsersManagementViewState extends State<UsersManagementView> {
     );
   }
 
-  void _printLetterFromData(Map<String, dynamic> letter) {
-    final String formattedDate = DateFormat("dd/MM/yyyy").format(DateTime.now());
+  Future<void> _printLetterFromData(Map<String, dynamic> letter) async {
+    final DateTime? pickedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now().subtract(const Duration(days: 30)),
+      lastDate: DateTime.now().add(const Duration(days: 90)),
+      helpText: 'DATA DE EMISSÃO DA CARTA',
+      cancelText: 'CANCELAR',
+      confirmText: 'CONFIRMAR',
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: AppColors.primaryBlue,
+              onPrimary: Colors.white,
+              onSurface: AppColors.textPrimary,
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.primaryBlue,
+              ),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (pickedDate == null) return;
+
+    final String formattedDate = DateFormat("dd/MM/yyyy").format(pickedDate);
     final String title = letter['title'] ?? 'CARTA DE APRESENTAÇÃO';
     final String type = letter['type'] ?? 'diarias';
     final String promoterName = letter['promoterName'] ?? '';
     final String promoterCpfFormatted = letter['promoterCpfFormatted'] ?? letter['promoterCpf'] ?? '';
     final String storeName = letter['storeName'] ?? '';
-    final String expiresAt = letter['expiresAt'] != null
-        ? DateFormat("dd/MM/yyyy").format(DateTime.parse(letter['expiresAt']))
-        : '';
     final int validityDays = type == 'treinamento' ? 1 : 3;
+    final DateTime expirationDateTime = pickedDate.add(Duration(days: validityDays));
+    final String expiresAt = DateFormat("dd/MM/yyyy").format(expirationDateTime);
 
     final String printHtml = '''
 <!DOCTYPE html>
