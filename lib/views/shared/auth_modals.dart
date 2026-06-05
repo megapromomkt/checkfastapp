@@ -618,7 +618,24 @@ class _RegisterDialogState extends State<_RegisterDialog> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
+  String? _nameError;
+  String? _phoneError;
+  String? _birthError;
   String? _cpfError;
+  String? _cepError;
+  String? _addressError;
+  String? _bairroError;
+  String? _cityError;
+  String? _ufError;
+  String? _emergencyNameError;
+  String? _emergencyPhoneError;
+  String? _pixError;
+  String? _bankError;
+  String? _agencyError;
+  String? _accountError;
+  String? _digitError;
+  String? _passwordError;
+  String? _confirmPasswordError;
 
   bool _isValidCPF(String cpf) {
     cpf = cpf.replaceAll(RegExp(r'\D'), '');
@@ -731,7 +748,17 @@ class _RegisterDialogState extends State<_RegisterDialog> {
                       _buildSectionTitle('1. Dados Pessoais'),
                       const SizedBox(height: 16),
                       _buildLabel('NOME COMPLETO *'),
-                      _buildInputField(controller: _nameController, hint: 'Ex: João Silva', icon: IconsaxPlusLinear.user),
+                      _buildInputField(
+                        controller: _nameController, 
+                        hint: 'Ex: João Silva', 
+                        icon: IconsaxPlusLinear.user,
+                        errorText: _nameError,
+                        onChanged: (val) {
+                          if (_nameError != null) {
+                            setState(() => _nameError = null);
+                          }
+                        },
+                      ),
                       const SizedBox(height: 16),
                       
                       Responsive.row(
@@ -742,14 +769,36 @@ class _RegisterDialogState extends State<_RegisterDialog> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildLabel('TELEFONE *'),
-                              _buildInputField(controller: _phoneController, hint: '(11) 99999-9999', icon: IconsaxPlusLinear.call, keyboardType: TextInputType.phone),
+                              _buildInputField(
+                                controller: _phoneController, 
+                                hint: '(11) 99999-9999', 
+                                icon: IconsaxPlusLinear.call, 
+                                keyboardType: TextInputType.phone,
+                                errorText: _phoneError,
+                                onChanged: (val) {
+                                  if (_phoneError != null) {
+                                    setState(() => _phoneError = null);
+                                  }
+                                },
+                              ),
                             ],
                           ),
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildLabel('DATA DE NASCIMENTO *'),
-                              _buildInputField(controller: _birthController, hint: 'DD/MM/AAAA', icon: IconsaxPlusLinear.calendar_1, keyboardType: TextInputType.datetime),
+                              _buildInputField(
+                                controller: _birthController, 
+                                hint: 'DD/MM/AAAA', 
+                                icon: IconsaxPlusLinear.calendar_1, 
+                                keyboardType: TextInputType.datetime,
+                                errorText: _birthError,
+                                onChanged: (val) {
+                                  if (_birthError != null) {
+                                    setState(() => _birthError = null);
+                                  }
+                                },
+                              ),
                             ],
                           ),
                         ],
@@ -788,7 +837,13 @@ class _RegisterDialogState extends State<_RegisterDialog> {
                                 hint: '00000-000', 
                                 icon: IconsaxPlusLinear.location, 
                                 keyboardType: TextInputType.number,
-                                onChanged: _lookupCEP,
+                                errorText: _cepError,
+                                onChanged: (val) {
+                                  if (_cepError != null) {
+                                    setState(() => _cepError = null);
+                                  }
+                                  _lookupCEP(val);
+                                },
                               ),
                             ],
                           ),
@@ -796,7 +851,17 @@ class _RegisterDialogState extends State<_RegisterDialog> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildLabel('ENDEREÇO *'),
-                              _buildInputField(controller: _addressController, hint: 'Rua, número, complemento', icon: IconsaxPlusLinear.map),
+                              _buildInputField(
+                                controller: _addressController, 
+                                hint: 'Rua, número, complemento', 
+                                icon: IconsaxPlusLinear.map,
+                                errorText: _addressError,
+                                onChanged: (val) {
+                                  if (_addressError != null) {
+                                    setState(() => _addressError = null);
+                                  }
+                                },
+                              ),
                             ],
                           ),
                         ],
@@ -811,21 +876,51 @@ class _RegisterDialogState extends State<_RegisterDialog> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildLabel('BAIRRO *'),
-                              _buildInputField(controller: _bairroController, hint: 'Seu bairro', icon: IconsaxPlusLinear.map_1),
+                              _buildInputField(
+                                controller: _bairroController, 
+                                hint: 'Seu bairro', 
+                                icon: IconsaxPlusLinear.map_1,
+                                errorText: _bairroError,
+                                onChanged: (val) {
+                                  if (_bairroError != null) {
+                                    setState(() => _bairroError = null);
+                                  }
+                                },
+                              ),
                             ],
                           ),
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildLabel('CIDADE *'),
-                              _buildInputField(controller: _cityController, hint: 'Sua cidade', icon: IconsaxPlusLinear.building),
+                              _buildInputField(
+                                controller: _cityController, 
+                                hint: 'Sua cidade', 
+                                icon: IconsaxPlusLinear.building,
+                                errorText: _cityError,
+                                onChanged: (val) {
+                                  if (_cityError != null) {
+                                    setState(() => _cityError = null);
+                                  }
+                                },
+                              ),
                             ],
                           ),
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildLabel('UF *'),
-                              _buildInputField(controller: _ufController, hint: 'SP', icon: IconsaxPlusLinear.global),
+                              _buildInputField(
+                                controller: _ufController, 
+                                hint: 'SP', 
+                                icon: IconsaxPlusLinear.global,
+                                errorText: _ufError,
+                                onChanged: (val) {
+                                  if (_ufError != null) {
+                                    setState(() => _ufError = null);
+                                  }
+                                },
+                              ),
                             ],
                           ),
                         ],
@@ -837,11 +932,32 @@ class _RegisterDialogState extends State<_RegisterDialog> {
                       const SizedBox(height: 16),
                       
                       _buildLabel('NOME DO CONTATO *'),
-                      _buildInputField(controller: _emergencyNameController, hint: 'Nome do familiar ou amigo', icon: IconsaxPlusLinear.user_tag),
+                      _buildInputField(
+                        controller: _emergencyNameController, 
+                        hint: 'Nome do familiar ou amigo', 
+                        icon: IconsaxPlusLinear.user_tag,
+                        errorText: _emergencyNameError,
+                        onChanged: (val) {
+                          if (_emergencyNameError != null) {
+                            setState(() => _emergencyNameError = null);
+                          }
+                        },
+                      ),
                       const SizedBox(height: 16),
                       
                       _buildLabel('TELEFONE DE EMERGÊNCIA *'),
-                      _buildInputField(controller: _emergencyPhoneController, hint: '(11) 99999-9999', icon: IconsaxPlusLinear.call, keyboardType: TextInputType.phone),
+                      _buildInputField(
+                        controller: _emergencyPhoneController, 
+                        hint: '(11) 99999-9999', 
+                        icon: IconsaxPlusLinear.call, 
+                        keyboardType: TextInputType.phone,
+                        errorText: _emergencyPhoneError,
+                        onChanged: (val) {
+                          if (_emergencyPhoneError != null) {
+                            setState(() => _emergencyPhoneError = null);
+                          }
+                        },
+                      ),
                       const SizedBox(height: 32),
 
                       // BLOCO 4: DADOS BANCÁRIOS
@@ -849,11 +965,31 @@ class _RegisterDialogState extends State<_RegisterDialog> {
                       const SizedBox(height: 16),
                       
                       _buildLabel('CHAVE PIX *'),
-                      _buildInputField(controller: _pixController, hint: 'CPF, E-mail, Celular ou Aleatória', icon: IconsaxPlusLinear.empty_wallet),
+                      _buildInputField(
+                        controller: _pixController, 
+                        hint: 'CPF, E-mail, Celular ou Aleatória', 
+                        icon: IconsaxPlusLinear.empty_wallet,
+                        errorText: _pixError,
+                        onChanged: (val) {
+                          if (_pixError != null) {
+                            setState(() => _pixError = null);
+                          }
+                        },
+                      ),
                       const SizedBox(height: 16),
                       
                       _buildLabel('BANCO *'),
-                      _buildInputField(controller: _bankController, hint: 'Ex: Itaú, Bradesco, Nubank', icon: IconsaxPlusLinear.bank),
+                      _buildInputField(
+                        controller: _bankController, 
+                        hint: 'Ex: Itaú, Bradesco, Nubank', 
+                        icon: IconsaxPlusLinear.bank,
+                        errorText: _bankError,
+                        onChanged: (val) {
+                          if (_bankError != null) {
+                            setState(() => _bankError = null);
+                          }
+                        },
+                      ),
                       const SizedBox(height: 16),
                       
                       Responsive.row(
@@ -864,21 +1000,54 @@ class _RegisterDialogState extends State<_RegisterDialog> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildLabel('AGÊNCIA *'),
-                              _buildInputField(controller: _agencyController, hint: '0000', icon: IconsaxPlusLinear.element_3, keyboardType: TextInputType.number),
+                              _buildInputField(
+                                controller: _agencyController, 
+                                hint: '0000', 
+                                icon: IconsaxPlusLinear.element_3, 
+                                keyboardType: TextInputType.number,
+                                errorText: _agencyError,
+                                onChanged: (val) {
+                                  if (_agencyError != null) {
+                                    setState(() => _agencyError = null);
+                                  }
+                                },
+                              ),
                             ],
                           ),
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildLabel('CONTA *'),
-                              _buildInputField(controller: _accountController, hint: '00000000', icon: IconsaxPlusLinear.card, keyboardType: TextInputType.number),
+                              _buildInputField(
+                                controller: _accountController, 
+                                hint: '00000000', 
+                                icon: IconsaxPlusLinear.card, 
+                                keyboardType: TextInputType.number,
+                                errorText: _accountError,
+                                onChanged: (val) {
+                                  if (_accountError != null) {
+                                    setState(() => _accountError = null);
+                                  }
+                                },
+                              ),
                             ],
                           ),
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildLabel('DÍGITO *'),
-                              _buildInputField(controller: _digitController, hint: '0', icon: IconsaxPlusLinear.verify, keyboardType: TextInputType.number),
+                              _buildInputField(
+                                controller: _digitController, 
+                                hint: '0', 
+                                icon: IconsaxPlusLinear.verify, 
+                                keyboardType: TextInputType.number,
+                                errorText: _digitError,
+                                onChanged: (val) {
+                                  if (_digitError != null) {
+                                    setState(() => _digitError = null);
+                                  }
+                                },
+                              ),
                             ],
                           ),
                         ],
@@ -890,11 +1059,33 @@ class _RegisterDialogState extends State<_RegisterDialog> {
                       const SizedBox(height: 16),
                       
                       _buildLabel('SENHA (MÍNIMO 6 DÍGITOS) *'),
-                      _buildInputField(controller: _passwordController, hint: '••••••••', icon: IconsaxPlusLinear.lock, obscureText: true),
+                      _buildInputField(
+                        controller: _passwordController, 
+                        hint: '••••••••', 
+                        icon: IconsaxPlusLinear.lock, 
+                        obscureText: true,
+                        errorText: _passwordError,
+                        onChanged: (val) {
+                          if (_passwordError != null) {
+                            setState(() => _passwordError = null);
+                          }
+                        },
+                      ),
                       const SizedBox(height: 16),
                       
                       _buildLabel('CONFIRMAÇÃO DE SENHA *'),
-                      _buildInputField(controller: _confirmPasswordController, hint: '••••••••', icon: IconsaxPlusLinear.lock, obscureText: true),
+                      _buildInputField(
+                        controller: _confirmPasswordController, 
+                        hint: '••••••••', 
+                        icon: IconsaxPlusLinear.lock, 
+                        obscureText: true,
+                        errorText: _confirmPasswordError,
+                        onChanged: (val) {
+                          if (_confirmPasswordError != null) {
+                            setState(() => _confirmPasswordError = null);
+                          }
+                        },
+                      ),
                     ],
                   ),
                 ),
@@ -926,51 +1117,167 @@ class _RegisterDialogState extends State<_RegisterDialog> {
                     child: ElevatedButton(
                         onPressed: () async {
                           // Validação de todos os campos obrigatórios
-                          if (_nameController.text.trim().isEmpty || 
-                              _phoneController.text.trim().isEmpty ||
-                              _birthController.text.trim().isEmpty ||
-                              _cpfController.text.trim().isEmpty ||
-                              _cepController.text.trim().isEmpty ||
-                              _addressController.text.trim().isEmpty ||
-                              _bairroController.text.trim().isEmpty ||
-                              _cityController.text.trim().isEmpty ||
-                              _ufController.text.trim().isEmpty ||
-                              _emergencyNameController.text.trim().isEmpty ||
-                              _emergencyPhoneController.text.trim().isEmpty ||
-                              _pixController.text.trim().isEmpty ||
-                              _bankController.text.trim().isEmpty ||
-                              _agencyController.text.trim().isEmpty ||
-                              _accountController.text.trim().isEmpty ||
-                              _digitController.text.trim().isEmpty ||
-                              _passwordController.text.trim().isEmpty ||
-                              _confirmPasswordController.text.trim().isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Por favor, preencha todos os campos obrigatórios.'), backgroundColor: Colors.orange)
-                            );
-                            return;
+                          setState(() {
+                            _nameError = null;
+                            _phoneError = null;
+                            _birthError = null;
+                            _cpfError = null;
+                            _cepError = null;
+                            _addressError = null;
+                            _bairroError = null;
+                            _cityError = null;
+                            _ufError = null;
+                            _emergencyNameError = null;
+                            _emergencyPhoneError = null;
+                            _pixError = null;
+                            _bankError = null;
+                            _agencyError = null;
+                            _accountError = null;
+                            _digitError = null;
+                            _passwordError = null;
+                            _confirmPasswordError = null;
+                          });
+
+                          bool hasError = false;
+
+                          if (_nameController.text.trim().isEmpty) {
+                            _nameError = 'Nome completo é obrigatório.';
+                            hasError = true;
+                          } else {
+                            final nameParts = _nameController.text.trim().split(RegExp(r'\s+'));
+                            if (nameParts.length < 2) {
+                              _nameError = 'Por favor, insira nome e sobrenome.';
+                              hasError = true;
+                            }
                           }
 
-                          // Validação de tamanho da senha
-                          if (_passwordController.text.length < 6) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('A senha deve ter no mínimo 6 dígitos.'), backgroundColor: Colors.redAccent)
-                            );
-                            return;
+                          if (_phoneController.text.trim().isEmpty) {
+                            _phoneError = 'Telefone é obrigatório.';
+                            hasError = true;
+                          } else {
+                            final cleanPhone = _phoneController.text.replaceAll(RegExp(r'\D'), '');
+                            if (cleanPhone.length < 10 || cleanPhone.length > 11) {
+                              _phoneError = 'Telefone inválido (10 ou 11 dígitos com DDD).';
+                              hasError = true;
+                            }
                           }
 
-                          // Validação de confirmação de senha
-                          if (_passwordController.text != _confirmPasswordController.text) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('As senhas não coincidem.'), backgroundColor: Colors.redAccent)
-                            );
-                            return;
+                          if (_birthController.text.trim().isEmpty) {
+                            _birthError = 'Data de nascimento é obrigatória.';
+                            hasError = true;
+                          } else {
+                            final birthText = _birthController.text.trim();
+                            final birthRegex = RegExp(r'^\d{2}/\d{2}/\d{4}$');
+                            if (!birthRegex.hasMatch(birthText)) {
+                              _birthError = 'Use o formato DD/MM/AAAA.';
+                              hasError = true;
+                            }
                           }
 
-                          // Validação de CPF
-                          if (!_isValidCPF(_cpfController.text)) {
-                            setState(() {
-                              _cpfError = 'CPF inválido. Verifique os números.';
-                            });
+                          if (_cpfController.text.trim().isEmpty) {
+                            _cpfError = 'CPF é obrigatório.';
+                            hasError = true;
+                          } else if (!_isValidCPF(_cpfController.text)) {
+                            _cpfError = 'CPF inválido. Verifique os números.';
+                            hasError = true;
+                          }
+
+                          if (_cepController.text.trim().isEmpty) {
+                            _cepError = 'CEP é obrigatório.';
+                            hasError = true;
+                          } else {
+                            final cleanCEP = _cepController.text.replaceAll(RegExp(r'\D'), '');
+                            if (cleanCEP.length != 8) {
+                              _cepError = 'CEP inválido (8 dígitos).';
+                              hasError = true;
+                            }
+                          }
+
+                          if (_addressController.text.trim().isEmpty) {
+                            _addressError = 'Endereço é obrigatório.';
+                            hasError = true;
+                          }
+
+                          if (_bairroController.text.trim().isEmpty) {
+                            _bairroError = 'Bairro é obrigatório.';
+                            hasError = true;
+                          }
+
+                          if (_cityController.text.trim().isEmpty) {
+                            _cityError = 'Cidade é obrigatória.';
+                            hasError = true;
+                          }
+
+                          if (_ufController.text.trim().isEmpty) {
+                            _ufError = 'UF é obrigatória.';
+                            hasError = true;
+                          } else if (_ufController.text.trim().length != 2) {
+                            _ufError = 'Use 2 letras (Ex: SP).';
+                            hasError = true;
+                          }
+
+                          if (_emergencyNameController.text.trim().isEmpty) {
+                            _emergencyNameError = 'Nome do contato é obrigatório.';
+                            hasError = true;
+                          }
+
+                          if (_emergencyPhoneController.text.trim().isEmpty) {
+                            _emergencyPhoneError = 'Telefone de emergência é obrigatório.';
+                            hasError = true;
+                          } else {
+                            final cleanEmerPhone = _emergencyPhoneController.text.replaceAll(RegExp(r'\D'), '');
+                            if (cleanEmerPhone.length < 10 || cleanEmerPhone.length > 11) {
+                              _emergencyPhoneError = 'Telefone inválido (10 ou 11 dígitos com DDD).';
+                              hasError = true;
+                            }
+                          }
+
+                          if (_pixController.text.trim().isEmpty) {
+                            _pixError = 'Chave PIX é obrigatória.';
+                            hasError = true;
+                          }
+
+                          if (_bankController.text.trim().isEmpty) {
+                            _bankError = 'Banco é obrigatório.';
+                            hasError = true;
+                          }
+
+                          if (_agencyController.text.trim().isEmpty) {
+                            _agencyError = 'Agência é obrigatória.';
+                            hasError = true;
+                          }
+
+                          if (_accountController.text.trim().isEmpty) {
+                            _accountError = 'Conta é obrigatória.';
+                            hasError = true;
+                          }
+
+                          if (_digitController.text.trim().isEmpty) {
+                            _digitError = 'Dígito é obrigatório.';
+                            hasError = true;
+                          }
+
+                          if (_passwordController.text.trim().isEmpty) {
+                            _passwordError = 'Senha é obrigatória.';
+                            hasError = true;
+                          } else if (_passwordController.text.length < 6) {
+                            _passwordError = 'A senha deve ter no mínimo 6 dígitos.';
+                            hasError = true;
+                          }
+
+                          if (_confirmPasswordController.text.trim().isEmpty) {
+                            _confirmPasswordError = 'Confirmação é obrigatória.';
+                            hasError = true;
+                          } else if (_passwordController.text != _confirmPasswordController.text) {
+                            _confirmPasswordError = 'As senhas não coincidem.';
+                            hasError = true;
+                          }
+
+                          if (hasError) {
+                            setState(() {});
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Por favor, corrija os erros destacados no formulário.'), backgroundColor: Colors.orange)
+                            );
                             return;
                           }
 
@@ -994,6 +1301,7 @@ class _RegisterDialogState extends State<_RegisterDialog> {
                               'id': cleanCPF,
                               'authUid': authUid,
                               'role': 'worker',
+                              'type': 'prestador',
                               'name': _nameController.text,
                               'phone': _phoneController.text,
                               'birthDate': _birthController.text,

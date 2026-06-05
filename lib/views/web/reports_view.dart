@@ -75,15 +75,17 @@ class _ReportsViewState extends State<ReportsView> {
       final appsSnapshot = await FirebaseFirestore.instance.collection('applications').get();
       final applications = appsSnapshot.docs.map((doc) => doc.data() as Map<String, dynamic>).toList();
 
-      // Load Promoter users to resolve names
       final usersSnapshot = await FirebaseFirestore.instance
           .collection('users')
-          .where('type', isEqualTo: 'prestador')
           .get();
       final Map<String, String> promoterNames = {};
       for (var doc in usersSnapshot.docs) {
         final data = doc.data();
-        promoterNames[doc.id] = data['name'] ?? '';
+        final role = data['role']?.toString() ?? '';
+        final type = data['type']?.toString() ?? '';
+        if (role == 'worker' || type == 'prestador') {
+          promoterNames[doc.id] = data['name'] ?? '';
+        }
       }
 
       setState(() {
@@ -224,7 +226,7 @@ class _ReportsViewState extends State<ReportsView> {
           } else {
             for (var app in demandApps) {
               final cpf = app['promoterCpf'] ?? '';
-              final name = _promoterNames[cpf] ?? 'CPF: $cpf';
+              final name = app['promoterName']?.toString() ?? _promoterNames[cpf] ?? 'CPF: $cpf';
               final status = app['status'] ?? 'pendente';
 
               sheetObject.appendRow([
@@ -1208,7 +1210,7 @@ class _ReportsViewState extends State<ReportsView> {
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: demandApps.map((app) {
                                               final cpf = app['promoterCpf'] ?? '';
-                                              final name = _promoterNames[cpf] ?? 'CPF: $cpf';
+                                              final name = app['promoterName']?.toString() ?? _promoterNames[cpf] ?? 'CPF: $cpf';
                                               final status = app['status'] ?? 'pendente';
                                               
                                               // Translate/format status
