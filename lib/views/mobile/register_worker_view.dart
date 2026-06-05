@@ -65,7 +65,7 @@ class _RegisterWorkerViewState extends State<RegisterWorkerView> {
               const SizedBox(height: 15),
               _buildTextField('CPF', Icons.badge_outlined, keyboardType: TextInputType.number),
               const SizedBox(height: 15),
-              _buildTextField('Telefone (WhatsApp)', Icons.phone_outlined, keyboardType: TextInputType.phone),
+              _buildTextField('Telefone (WhatsApp) *', Icons.phone_outlined, keyboardType: TextInputType.phone),
               const SizedBox(height: 15),
               _buildTextField('E-mail', Icons.email_outlined, keyboardType: TextInputType.emailAddress),
               const SizedBox(height: 15),

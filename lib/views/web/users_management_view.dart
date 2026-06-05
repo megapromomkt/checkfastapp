@@ -29,6 +29,41 @@ class _UsersManagementViewState extends State<UsersManagementView> {
   final _regionalCtrl2 = TextEditingController();
   final _searchCtrl = TextEditingController();
 
+  // Novos controllers - dados do perfil, pessoais, endereço, profissionais e veículo
+  final _telefoneCtrl = TextEditingController();
+  final _loginCtrl = TextEditingController();
+  final _cpfCtrl = TextEditingController();
+  final _rgCtrl = TextEditingController();
+  final _nascimentoCtrl = TextEditingController();
+  final _sexoCtrl = TextEditingController();
+  final _bancoCtrl = TextEditingController();
+  final _agenciaCtrl = TextEditingController();
+  final _contaCtrl = TextEditingController();
+  final _pixCtrl = TextEditingController();
+  final _tipoContaCtrl = TextEditingController();
+  final _contatoEmergenciaNomeCtrl = TextEditingController();
+  final _contatoEmergenciaFoneCtrl = TextEditingController();
+  final _contatoEmergenciaParentescoCtrl = TextEditingController();
+  final _cepCtrl = TextEditingController();
+  final _ruaCtrl = TextEditingController();
+  final _numeroCtrl = TextEditingController();
+  final _bairroCtrl = TextEditingController();
+  final _cidadeCtrl = TextEditingController();
+  final _estadoCtrl = TextEditingController();
+  final _latitudeCtrl = TextEditingController();
+  final _longitudeCtrl = TextEditingController();
+  final _cargoAtualCtrl = TextEditingController();
+  final _ultimoCargoCtrl = TextEditingController();
+  final _tempoExperienciaCtrl = TextEditingController();
+  final _pretensaoSalarialCtrl = TextEditingController();
+  final _cnhCategoriaCtrl = TextEditingController();
+  final _cnhValidadeCtrl = TextEditingController();
+  final _veiculoProprioCtrl = TextEditingController();
+  final _carroCtrl = TextEditingController();
+  final _motoCtrl = TextEditingController();
+  final _horariosCtrl = TextEditingController();
+  final _raioDeslocamentoCtrl = TextEditingController();
+
   final _api = RegisterService();
   bool _loading = true;
   List<AppUser> _users = [];
@@ -56,6 +91,39 @@ class _UsersManagementViewState extends State<UsersManagementView> {
     _passwordCtrl.dispose();
     _regionalCtrl2.dispose();
     _searchCtrl.dispose();
+    _telefoneCtrl.dispose();
+    _loginCtrl.dispose();
+    _cpfCtrl.dispose();
+    _rgCtrl.dispose();
+    _nascimentoCtrl.dispose();
+    _sexoCtrl.dispose();
+    _bancoCtrl.dispose();
+    _agenciaCtrl.dispose();
+    _contaCtrl.dispose();
+    _pixCtrl.dispose();
+    _tipoContaCtrl.dispose();
+    _contatoEmergenciaNomeCtrl.dispose();
+    _contatoEmergenciaFoneCtrl.dispose();
+    _contatoEmergenciaParentescoCtrl.dispose();
+    _cepCtrl.dispose();
+    _ruaCtrl.dispose();
+    _numeroCtrl.dispose();
+    _bairroCtrl.dispose();
+    _cidadeCtrl.dispose();
+    _estadoCtrl.dispose();
+    _latitudeCtrl.dispose();
+    _longitudeCtrl.dispose();
+    _cargoAtualCtrl.dispose();
+    _ultimoCargoCtrl.dispose();
+    _tempoExperienciaCtrl.dispose();
+    _pretensaoSalarialCtrl.dispose();
+    _cnhCategoriaCtrl.dispose();
+    _cnhValidadeCtrl.dispose();
+    _veiculoProprioCtrl.dispose();
+    _carroCtrl.dispose();
+    _motoCtrl.dispose();
+    _horariosCtrl.dispose();
+    _raioDeslocamentoCtrl.dispose();
     super.dispose();
   }
 
@@ -92,7 +160,8 @@ class _UsersManagementViewState extends State<UsersManagementView> {
       if (query.isEmpty) return true;
       return user.name.toLowerCase().contains(query) ||
              user.email.toLowerCase().contains(query) ||
-             user.role.toLowerCase().contains(query);
+             user.role.toLowerCase().contains(query) ||
+             user.phone.toLowerCase().contains(query);
     }).toList();
 
     filteredUsers.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
@@ -133,6 +202,39 @@ class _UsersManagementViewState extends State<UsersManagementView> {
                 _atacadaoExperience = false;
                 _isBlocked = false;
                 _blockJustificationCtrl.clear();
+                _telefoneCtrl.clear();
+                _loginCtrl.clear();
+                _cpfCtrl.clear();
+                _rgCtrl.clear();
+                _nascimentoCtrl.clear();
+                _sexoCtrl.clear();
+                _bancoCtrl.clear();
+                _agenciaCtrl.clear();
+                _contaCtrl.clear();
+                _pixCtrl.clear();
+                _tipoContaCtrl.clear();
+                _contatoEmergenciaNomeCtrl.clear();
+                _contatoEmergenciaFoneCtrl.clear();
+                _contatoEmergenciaParentescoCtrl.clear();
+                _cepCtrl.clear();
+                _ruaCtrl.clear();
+                _numeroCtrl.clear();
+                _bairroCtrl.clear();
+                _cidadeCtrl.clear();
+                _estadoCtrl.clear();
+                _latitudeCtrl.clear();
+                _longitudeCtrl.clear();
+                _cargoAtualCtrl.clear();
+                _ultimoCargoCtrl.clear();
+                _tempoExperienciaCtrl.clear();
+                _pretensaoSalarialCtrl.clear();
+                _cnhCategoriaCtrl.clear();
+                _cnhValidadeCtrl.clear();
+                _veiculoProprioCtrl.clear();
+                _carroCtrl.clear();
+                _motoCtrl.clear();
+                _horariosCtrl.clear();
+                _raioDeslocamentoCtrl.clear();
                 _currentFormTab = 0;
                 _showingForm = true;
               }),
@@ -236,7 +338,7 @@ class _UsersManagementViewState extends State<UsersManagementView> {
                 final user = filteredUsers[index];
                 return ListTile(
                   title: Text(user.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text('${user.email} | ${user.role}'),
+                  subtitle: Text('${user.email} | ${user.role}${user.phone.isNotEmpty ? ' | 📱 ${user.phone}' : ''}'),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -284,6 +386,65 @@ class _UsersManagementViewState extends State<UsersManagementView> {
                             _atacadaoExperience = user.atacadaoExperience;
                             _isBlocked = user.isBlocked;
                             _blockJustificationCtrl.clear();
+                            
+                            // Carregar campos root adicionais
+                            _telefoneCtrl.text = user.phone;
+                            _cepCtrl.text = user.addressCep ?? '';
+                            _ruaCtrl.text = user.addressRua ?? '';
+                            _bairroCtrl.text = user.addressBairro ?? '';
+                            _cidadeCtrl.text = user.addressCity ?? '';
+                            _estadoCtrl.text = user.addressUf ?? '';
+                            _pixCtrl.text = user.pixKey;
+
+                            // Decodificar curriculumCompletoDados se houver
+                            final Map<String, dynamic> cv = user.curriculumCompletoDados != null && user.curriculumCompletoDados!.isNotEmpty
+                                ? jsonDecode(user.curriculumCompletoDados!)
+                                : {};
+                            
+                            final personal = cv['dados_pessoais'] ?? {};
+                            final docs = cv['documentacao'] ?? {};
+                            final prof = cv['dados_profissionais'] ?? {};
+                            final disp = cv['disponibilidade'] ?? {};
+                            
+                            _loginCtrl.text = personal['login'] ?? '';
+                            _cpfCtrl.text = user.id; // CPF é o ID do prestador
+                            if (_cpfCtrl.text.isEmpty || _cpfCtrl.text.length < 11) {
+                              _cpfCtrl.text = personal['cpf'] ?? '';
+                            }
+                            _rgCtrl.text = personal['rg'] ?? '';
+                            _nascimentoCtrl.text = personal['nascimento'] ?? personal['data_nascimento'] ?? '';
+                            _sexoCtrl.text = personal['sexo'] ?? '';
+                            
+                            _bancoCtrl.text = personal['banco'] ?? '';
+                            _agenciaCtrl.text = personal['agencia'] ?? '';
+                            _contaCtrl.text = personal['conta'] ?? '';
+                            if (_pixCtrl.text.isEmpty) {
+                              _pixCtrl.text = docs['chave_pix'] ?? '';
+                            }
+                            _tipoContaCtrl.text = personal['tipo_conta'] ?? '';
+                            
+                            _contatoEmergenciaNomeCtrl.text = personal['contato_emergencia_nome'] ?? '';
+                            _contatoEmergenciaFoneCtrl.text = personal['contato_emergencia_fone'] ?? '';
+                            _contatoEmergenciaParentescoCtrl.text = personal['contato_emergencia_parentesco'] ?? '';
+                            
+                            _numeroCtrl.text = personal['numero'] ?? '';
+                            _latitudeCtrl.text = personal['latitude']?.toString() ?? '';
+                            _longitudeCtrl.text = personal['longitude']?.toString() ?? '';
+                            
+                            _cargoAtualCtrl.text = prof['cargo_atual'] ?? '';
+                            _ultimoCargoCtrl.text = prof['ultimo_cargo'] ?? '';
+                            _tempoExperienciaCtrl.text = prof['tempo_experiencia'] ?? '';
+                            _pretensaoSalarialCtrl.text = prof['pretensao_salarial'] ?? '';
+                            
+                            _cnhCategoriaCtrl.text = docs['cnh_categoria'] ?? '';
+                            _cnhValidadeCtrl.text = docs['cnh_validade'] ?? '';
+                            _veiculoProprioCtrl.text = docs['veiculo_proprio'] == true ? 'Sim' : (docs['veiculo_proprio'] == false ? 'Não' : '');
+                            _carroCtrl.text = docs['carro'] == true ? 'Sim' : (docs['carro'] == false ? 'Não' : '');
+                            _motoCtrl.text = docs['moto'] == true ? 'Sim' : (docs['moto'] == false ? 'Não' : '');
+                            
+                            _horariosCtrl.text = disp['horarios'] ?? '';
+                            _raioDeslocamentoCtrl.text = disp['raio']?.toString() ?? '';
+                            
                             _currentFormTab = 0;
                             _showingForm = true;
                           });
@@ -344,9 +505,10 @@ class _UsersManagementViewState extends State<UsersManagementView> {
                 _buildFormTab(0, 'Dados do Perfil'),
                 _buildFormTab(1, 'Dados pessoais'),
                 _buildFormTab(2, 'Endereço'),
-                _buildFormTab(3, 'Documentos'),
+                _buildFormTab(3, 'Profissional & Veículo'),
+                _buildFormTab(4, 'Documentos'),
                 if (_editingUser != null && _currentListTab == 0)
-                  _buildFormTab(4, 'Ocorrências'),
+                  _buildFormTab(5, 'Ocorrências'),
               ],
             ),
           ),
@@ -377,70 +539,187 @@ class _UsersManagementViewState extends State<UsersManagementView> {
             ),
             ElevatedButton(
               onPressed: () async {
-                if (_nomeCtrl.text.isNotEmpty) {
-                    final internalRoles = ['Admin', 'Suporte', 'Financeiro', 'RH', 'Trade'];
-                    final isRede = _cargoCtrl.text == 'Líder de Frente de Caixa' || _cargoCtrl.text == 'Regional';
-                    final userType = isRede ? 'rede' : (internalRoles.contains(_cargoCtrl.text) ? 'interno' : 'prestador');
-                    AppUser userToSave;
-
-                    final String pass = (_editingUser == null || _passwordCtrl.text != _editingUser!.password)
-                        ? SecurityService.hashPassword(_passwordCtrl.text)
-                        : _passwordCtrl.text;
-
-                    if (_editingUser != null) {
-                      userToSave = _editingUser!;
-                      userToSave.name = _nomeCtrl.text;
-                      userToSave.email = _emailCtrl.text.isNotEmpty ? _emailCtrl.text : 'Sem e-mail';
-                      userToSave.role = _cargoCtrl.text.isNotEmpty ? _cargoCtrl.text : 'Não definido';
-                      userToSave.password = pass;
-                      userToSave.type = userType;
-                      userToSave.storeId = _cargoCtrl.text == 'Líder de Frente de Caixa' ? _selectedStoreId : '';
-                      userToSave.regional = _cargoCtrl.text == 'Regional' ? _regionalCtrl2.text : '';
-                      userToSave.trainingCompleted = _trainingCompleted;
-                      userToSave.atacadaoExperience = _atacadaoExperience;
-                      userToSave.isBlocked = _isBlocked;
-                    } else {
-                      userToSave = AppUser(
-                        id: DateTime.now().millisecondsSinceEpoch.toString(),
-                        name: _nomeCtrl.text,
-                        email: _emailCtrl.text.isNotEmpty ? _emailCtrl.text : 'Sem e-mail',
-                        role: _cargoCtrl.text.isNotEmpty ? _cargoCtrl.text : 'Não definido',
-                        password: pass,
-                        status: 'Ativo',
-                        type: userType,
-                        storeId: _cargoCtrl.text == 'Líder de Frente de Caixa' ? _selectedStoreId : '',
-                        regional: _cargoCtrl.text == 'Regional' ? _regionalCtrl2.text : '',
-                        trainingCompleted: _trainingCompleted,
-                        atacadaoExperience: _atacadaoExperience,
-                        isBlocked: _isBlocked,
-                      );
-                    }
-
-                    if (_isBlocked && _blockJustificationCtrl.text.isNotEmpty) {
-                      final nowFormatted = DateFormat("dd/MM/yyyy HH:mm").format(DateTime.now());
-                      await FirebaseFirestore.instance.collection('occurrences').add({
-                        'promoterCpf': userToSave.id,
-                        'description': 'Bloqueio: ${_blockJustificationCtrl.text}',
-                        'storeName': 'Geral',
-                        'severity': 'Grave',
-                        'date': nowFormatted,
-                      });
-                    }
-                    
-                    await _api.saveUser(userToSave);
-                    
-                    setState(() {
-                      if (_editingUser == null) {
-                        _users.add(userToSave);
-                      }
-                      _showingForm = false;
-                      _nomeCtrl.clear();
-                      _emailCtrl.clear();
-                      _cargoCtrl.clear();
-                    });
-                } else {
+                if (_nomeCtrl.text.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Por favor, preencha o nome do usuário')));
+                  return;
                 }
+                
+                if (_telefoneCtrl.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('⚠️ O campo Celular / WhatsApp é obrigatório!'),
+                      backgroundColor: Colors.redAccent,
+                    ),
+                  );
+                  return;
+                }
+
+                final internalRoles = ['Admin', 'Suporte', 'Financeiro', 'RH', 'Trade'];
+                final isRede = _cargoCtrl.text == 'Líder de Frente de Caixa' || _cargoCtrl.text == 'Regional';
+                final userType = isRede ? 'rede' : (internalRoles.contains(_cargoCtrl.text) ? 'interno' : 'prestador');
+                AppUser userToSave;
+
+                final String pass = (_editingUser == null || _passwordCtrl.text != _editingUser!.password)
+                    ? SecurityService.hashPassword(_passwordCtrl.text)
+                    : _passwordCtrl.text;
+
+                if (_editingUser != null) {
+                  userToSave = _editingUser!;
+                  userToSave.name = _nomeCtrl.text;
+                  userToSave.email = _emailCtrl.text.isNotEmpty ? _emailCtrl.text : 'Sem e-mail';
+                  userToSave.role = _cargoCtrl.text.isNotEmpty ? _cargoCtrl.text : 'Não definido';
+                  userToSave.password = pass;
+                  userToSave.type = userType;
+                  userToSave.storeId = _cargoCtrl.text == 'Líder de Frente de Caixa' ? _selectedStoreId : '';
+                  userToSave.regional = _cargoCtrl.text == 'Regional' ? _regionalCtrl2.text : '';
+                  userToSave.trainingCompleted = _trainingCompleted;
+                  userToSave.atacadaoExperience = _atacadaoExperience;
+                  userToSave.isBlocked = _isBlocked;
+                } else {
+                  final String cleanCpf = _cpfCtrl.text.replaceAll(RegExp(r'\D'), '');
+                  final String generatedId = (userType == 'prestador' && cleanCpf.isNotEmpty)
+                      ? cleanCpf
+                      : DateTime.now().millisecondsSinceEpoch.toString();
+
+                  userToSave = AppUser(
+                    id: generatedId,
+                    name: _nomeCtrl.text,
+                    email: _emailCtrl.text.isNotEmpty ? _emailCtrl.text : 'Sem e-mail',
+                    role: _cargoCtrl.text.isNotEmpty ? _cargoCtrl.text : 'Não definido',
+                    password: pass,
+                    status: 'Ativo',
+                    type: userType,
+                    storeId: _cargoCtrl.text == 'Líder de Frente de Caixa' ? _selectedStoreId : '',
+                    regional: _cargoCtrl.text == 'Regional' ? _regionalCtrl2.text : '',
+                    trainingCompleted: _trainingCompleted,
+                    atacadaoExperience: _atacadaoExperience,
+                    isBlocked: _isBlocked,
+                  );
+                }
+
+                // 1. Atualizar campos root do user
+                userToSave.phone = _telefoneCtrl.text.trim();
+                userToSave.addressCep = _cepCtrl.text.trim();
+                userToSave.addressRua = _ruaCtrl.text.trim();
+                userToSave.addressBairro = _bairroCtrl.text.trim();
+                userToSave.addressCity = _cidadeCtrl.text.trim();
+                userToSave.addressUf = _estadoCtrl.text.trim();
+                userToSave.pixKey = _pixCtrl.text.trim();
+
+                // 2. Atualizar curriculumCompletoDados
+                final Map<String, dynamic> cv = userToSave.curriculumCompletoDados != null && userToSave.curriculumCompletoDados!.isNotEmpty
+                    ? jsonDecode(userToSave.curriculumCompletoDados!)
+                    : {};
+
+                final dadosPessoais = Map<String, dynamic>.from(cv['dados_pessoais'] ?? {});
+                dadosPessoais['rg'] = _rgCtrl.text.trim();
+                dadosPessoais['nascimento'] = _nascimentoCtrl.text.trim();
+                dadosPessoais['sexo'] = _sexoCtrl.text.trim();
+                dadosPessoais['login'] = _loginCtrl.text.trim();
+                dadosPessoais['whatsapp'] = _telefoneCtrl.text.trim();
+                dadosPessoais['banco'] = _bancoCtrl.text.trim();
+                dadosPessoais['agencia'] = _agenciaCtrl.text.trim();
+                dadosPessoais['conta'] = _contaCtrl.text.trim();
+                dadosPessoais['tipo_conta'] = _tipoContaCtrl.text.trim();
+                dadosPessoais['contato_emergencia_nome'] = _contatoEmergenciaNomeCtrl.text.trim();
+                dadosPessoais['contato_emergencia_fone'] = _contatoEmergenciaFoneCtrl.text.trim();
+                dadosPessoais['contato_emergencia_parentesco'] = _contatoEmergenciaParentescoCtrl.text.trim();
+                
+                dadosPessoais['rua'] = _ruaCtrl.text.trim();
+                dadosPessoais['bairro'] = _bairroCtrl.text.trim();
+                dadosPessoais['cep'] = _cepCtrl.text.trim();
+                dadosPessoais['numero'] = _numeroCtrl.text.trim();
+                dadosPessoais['cidade'] = _cidadeCtrl.text.trim();
+                dadosPessoais['estado'] = _estadoCtrl.text.trim();
+                if (_latitudeCtrl.text.isNotEmpty) {
+                  dadosPessoais['latitude'] = double.tryParse(_latitudeCtrl.text) ?? 0.0;
+                }
+                if (_longitudeCtrl.text.isNotEmpty) {
+                  dadosPessoais['longitude'] = double.tryParse(_longitudeCtrl.text) ?? 0.0;
+                }
+
+                final docsMap = Map<String, dynamic>.from(cv['documentacao'] ?? {});
+                docsMap['chave_pix'] = _pixCtrl.text.trim();
+                docsMap['cnh_categoria'] = _cnhCategoriaCtrl.text.trim();
+                docsMap['cnh_validade'] = _cnhValidadeCtrl.text.trim();
+                docsMap['veiculo_proprio'] = _veiculoProprioCtrl.text == 'Sim';
+                docsMap['carro'] = _carroCtrl.text == 'Sim';
+                docsMap['moto'] = _motoCtrl.text == 'Sim';
+
+                final profMap = Map<String, dynamic>.from(cv['dados_profissionais'] ?? {});
+                profMap['cargo_atual'] = _cargoAtualCtrl.text.trim();
+                profMap['ultimo_cargo'] = _ultimoCargoCtrl.text.trim();
+                profMap['tempo_experiencia'] = _tempoExperienciaCtrl.text.trim();
+                profMap['pretensao_salarial'] = _pretensaoSalarialCtrl.text.trim();
+
+                final dispMap = Map<String, dynamic>.from(cv['disponibilidade'] ?? {});
+                dispMap['horarios'] = _horariosCtrl.text.trim();
+                if (_raioDeslocamentoCtrl.text.isNotEmpty) {
+                  dispMap['raio'] = int.tryParse(_raioDeslocamentoCtrl.text) ?? 20;
+                }
+
+                cv['dados_pessoais'] = dadosPessoais;
+                cv['documentacao'] = docsMap;
+                cv['dados_profissionais'] = profMap;
+                cv['disponibilidade'] = dispMap;
+
+                userToSave.curriculumCompletoDados = jsonEncode(cv);
+
+                if (_isBlocked && _blockJustificationCtrl.text.isNotEmpty) {
+                  final nowFormatted = DateFormat("dd/MM/yyyy HH:mm").format(DateTime.now());
+                  await FirebaseFirestore.instance.collection('occurrences').add({
+                    'promoterCpf': userToSave.id,
+                    'description': 'Bloqueio: ${_blockJustificationCtrl.text}',
+                    'storeName': 'Geral',
+                    'severity': 'Grave',
+                    'date': nowFormatted,
+                  });
+                }
+                
+                await _api.saveUser(userToSave);
+                
+                setState(() {
+                  if (_editingUser == null) {
+                    _users.add(userToSave);
+                  }
+                  _showingForm = false;
+                  _nomeCtrl.clear();
+                  _emailCtrl.clear();
+                  _cargoCtrl.clear();
+                  _telefoneCtrl.clear();
+                  _loginCtrl.clear();
+                  _cpfCtrl.clear();
+                  _rgCtrl.clear();
+                  _nascimentoCtrl.clear();
+                  _sexoCtrl.clear();
+                  _bancoCtrl.clear();
+                  _agenciaCtrl.clear();
+                  _contaCtrl.clear();
+                  _pixCtrl.clear();
+                  _tipoContaCtrl.clear();
+                  _contatoEmergenciaNomeCtrl.clear();
+                  _contatoEmergenciaFoneCtrl.clear();
+                  _contatoEmergenciaParentescoCtrl.clear();
+                  _cepCtrl.clear();
+                  _ruaCtrl.clear();
+                  _numeroCtrl.clear();
+                  _bairroCtrl.clear();
+                  _cidadeCtrl.clear();
+                  _estadoCtrl.clear();
+                  _latitudeCtrl.clear();
+                  _longitudeCtrl.clear();
+                  _cargoAtualCtrl.clear();
+                  _ultimoCargoCtrl.clear();
+                  _tempoExperienciaCtrl.clear();
+                  _pretensaoSalarialCtrl.clear();
+                  _cnhCategoriaCtrl.clear();
+                  _cnhValidadeCtrl.clear();
+                  _veiculoProprioCtrl.clear();
+                  _carroCtrl.clear();
+                  _motoCtrl.clear();
+                  _horariosCtrl.clear();
+                  _raioDeslocamentoCtrl.clear();
+                });
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryBlue,
@@ -474,8 +753,9 @@ class _UsersManagementViewState extends State<UsersManagementView> {
       case 0: return _buildProfileTab();
       case 1: return _buildPersonalDataTab();
       case 2: return _buildAddressTab();
-      case 3: return _buildDocumentsTab();
-      case 4: 
+      case 3: return _buildProfissionalVeiculoTab();
+      case 4: return _buildDocumentsTab();
+      case 5: 
         if (_editingUser != null) {
           final tempFeedbackCtrl = TextEditingController();
           final Map<String, dynamic> cv = _editingUser!.curriculumCompletoDados != null && _editingUser!.curriculumCompletoDados!.isNotEmpty
@@ -516,9 +796,9 @@ class _UsersManagementViewState extends State<UsersManagementView> {
         ]),
         const SizedBox(height: 16),
         Row(children: [
-          Expanded(child: _buildTextField('Telefone')),
+          Expanded(child: _buildTextField('Telefone (Celular) *', controller: _telefoneCtrl)),
           const SizedBox(width: 16),
-          Expanded(child: _buildTextField('Login')),
+          Expanded(child: _buildTextField('Login', controller: _loginCtrl)),
         ]),
         const SizedBox(height: 16),
         Row(children: [
@@ -652,35 +932,35 @@ class _UsersManagementViewState extends State<UsersManagementView> {
         const SizedBox(height: 20),
         Row(
           children: [
-            Expanded(child: _buildTextField('CPF')),
+            Expanded(child: _buildTextField('CPF', controller: _cpfCtrl)),
             const SizedBox(width: 16),
-            Expanded(child: _buildTextField('RG')),
+            Expanded(child: _buildTextField('RG', controller: _rgCtrl)),
           ],
         ),
         const SizedBox(height: 16),
         Row(
           children: [
-            Expanded(child: _buildTextField('Data de Nascimento')),
+            Expanded(child: _buildTextField('Data de Nascimento', controller: _nascimentoCtrl)),
             const SizedBox(width: 16),
-            Expanded(child: _buildTextField('Sexo')),
+            Expanded(child: _buildTextField('Sexo', controller: _sexoCtrl)),
           ],
         ),
         const SizedBox(height: 16),
         Row(
           children: [
-            Expanded(child: _buildTextField('Banco')),
+            Expanded(child: _buildTextField('Banco', controller: _bancoCtrl)),
             const SizedBox(width: 16),
-            Expanded(child: _buildTextField('Agência')),
+            Expanded(child: _buildTextField('Agência', controller: _agenciaCtrl)),
             const SizedBox(width: 16),
-            Expanded(child: _buildTextField('Nº da Conta')),
+            Expanded(child: _buildTextField('Nº da Conta', controller: _contaCtrl)),
           ],
         ),
         const SizedBox(height: 16),
         Row(
           children: [
-            Expanded(child: _buildTextField('Chave Pix')),
+            Expanded(child: _buildTextField('Chave Pix', controller: _pixCtrl)),
             const SizedBox(width: 16),
-            Expanded(child: _buildTextField('Tipo de Conta')),
+            Expanded(child: _buildTextField('Tipo de Conta', controller: _tipoContaCtrl)),
           ],
         ),
         const SizedBox(height: 24),
@@ -688,15 +968,15 @@ class _UsersManagementViewState extends State<UsersManagementView> {
         const SizedBox(height: 10),
         Row(
           children: [
-            Expanded(child: _buildTextField('Nome do Contato')),
+            Expanded(child: _buildTextField('Nome do Contato', controller: _contatoEmergenciaNomeCtrl)),
             const SizedBox(width: 16),
-            Expanded(child: _buildTextField('Telefone de Emergência')),
+            Expanded(child: _buildTextField('Telefone de Emergência', controller: _contatoEmergenciaFoneCtrl)),
           ],
         ),
         const SizedBox(height: 16),
         Row(
           children: [
-            Expanded(child: _buildTextField('Grau de Parentesco')),
+            Expanded(child: _buildTextField('Grau de Parentesco', controller: _contatoEmergenciaParentescoCtrl)),
             const Spacer(),
           ],
         ),
@@ -713,33 +993,109 @@ class _UsersManagementViewState extends State<UsersManagementView> {
         const SizedBox(height: 20),
         Row(
           children: [
-            Expanded(child: _buildTextField('CEP')),
+            Expanded(child: _buildTextField('CEP', controller: _cepCtrl)),
             const SizedBox(width: 16),
-            Expanded(flex: 2, child: _buildTextField('Logradouro')),
+            Expanded(flex: 2, child: _buildTextField('Logradouro', controller: _ruaCtrl)),
             const SizedBox(width: 16),
-            Expanded(child: _buildTextField('Número')),
+            Expanded(child: _buildTextField('Número', controller: _numeroCtrl)),
           ],
         ),
         const SizedBox(height: 16),
         Row(
           children: [
-            Expanded(child: _buildTextField('Bairro')),
+            Expanded(child: _buildTextField('Bairro', controller: _bairroCtrl)),
             const SizedBox(width: 16),
-            Expanded(child: _buildTextField('Cidade')),
+            Expanded(child: _buildTextField('Cidade', controller: _cidadeCtrl)),
             const SizedBox(width: 16),
-            Expanded(child: _buildTextField('Estado')),
+            Expanded(child: _buildTextField('Estado', controller: _estadoCtrl)),
           ],
         ),
         const SizedBox(height: 16),
         Row(
           children: [
-            Expanded(child: _buildTextField('Latitude')),
+            Expanded(child: _buildTextField('Latitude', controller: _latitudeCtrl)),
             const SizedBox(width: 16),
-            Expanded(child: _buildTextField('Longitude')),
+            Expanded(child: _buildTextField('Longitude', controller: _longitudeCtrl)),
           ],
         ),
         const SizedBox(height: 16),
         const Text('Mapa será exibido aqui para confirmar a localização.', style: TextStyle(color: AppColors.textSecondary, fontStyle: FontStyle.italic)),
+      ],
+    );
+  }
+
+  Widget _buildProfissionalVeiculoTab() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Dados Profissionais', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primaryBlue)),
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            Expanded(child: _buildTextField('Cargo Atual', controller: _cargoAtualCtrl)),
+            const SizedBox(width: 16),
+            Expanded(child: _buildTextField('Último Cargo', controller: _ultimoCargoCtrl)),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(child: _buildTextField('Tempo de Experiência', controller: _tempoExperienciaCtrl)),
+            const SizedBox(width: 16),
+            Expanded(child: _buildTextField('Pretensão Salarial', controller: _pretensaoSalarialCtrl)),
+          ],
+        ),
+        const SizedBox(height: 24),
+        const Text('Documentação & Veículo', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primaryBlue)),
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            Expanded(child: _buildTextField('CNH Categoria', controller: _cnhCategoriaCtrl)),
+            const SizedBox(width: 16),
+            Expanded(child: _buildTextField('Validade CNH', controller: _cnhValidadeCtrl)),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: _buildDropdownField(
+                'Veículo Próprio?',
+                ['Sim', 'Não'],
+                value: _veiculoProprioCtrl.text.isEmpty ? null : _veiculoProprioCtrl.text,
+                onChanged: (val) => setState(() => _veiculoProprioCtrl.text = val ?? ''),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _buildDropdownField(
+                'Possui Carro?',
+                ['Sim', 'Não'],
+                value: _carroCtrl.text.isEmpty ? null : _carroCtrl.text,
+                onChanged: (val) => setState(() => _carroCtrl.text = val ?? ''),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _buildDropdownField(
+                'Possui Moto?',
+                ['Sim', 'Não'],
+                value: _motoCtrl.text.isEmpty ? null : _motoCtrl.text,
+                onChanged: (val) => setState(() => _motoCtrl.text = val ?? ''),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        const Text('Disponibilidade de Trabalho', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primaryBlue)),
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            Expanded(child: _buildTextField('Horário Disponível', controller: _horariosCtrl)),
+            const SizedBox(width: 16),
+            Expanded(child: _buildTextField('Raio Deslocamento (KM)', controller: _raioDeslocamentoCtrl)),
+          ],
+        ),
       ],
     );
   }

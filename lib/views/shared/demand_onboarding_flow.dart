@@ -599,6 +599,37 @@ class _OnboardingDialogState extends State<_OnboardingDialog> {
     );
 
     try {
+      // Check for duplicate application
+      final existingApps = await FirebaseFirestore.instance
+          .collection('applications')
+          .where('promoterCpf', isEqualTo: widget.userCpf)
+          .where('storeName', isEqualTo: widget.demand.storeName)
+          .where('date', isEqualTo: widget.demand.date)
+          .get();
+      
+      final activeDuplicates = existingApps.docs.where((doc) {
+        final status = doc.data()['status'] ?? '';
+        return status != 'rejeitado' && status != 'cancelado' && status != 'nao_aprovada';
+      }).toList();
+
+      if (activeDuplicates.isNotEmpty) {
+        Navigator.pop(context); // Pop loading
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Inscrição Duplicada'),
+            content: const Text('Você já possui um agendamento ou inscrição ativa para esta loja nesta data.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+
       bool trainingCompleted = false;
       bool atacadaoExperience = false;
       

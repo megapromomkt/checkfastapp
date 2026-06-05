@@ -97,6 +97,23 @@ class AuthModals {
                   }
 
                   final docData = doc.data() as Map<String, dynamic>;
+
+                  // Garante status ativo e classificação de prestador no primeiro login
+                  final statusVal = docData['status']?.toString() ?? '';
+                  final roleVal = docData['role']?.toString() ?? '';
+                  final typeVal = docData['type']?.toString() ?? '';
+                  
+                  if (statusVal != 'Ativo' || typeVal.isEmpty || roleVal.isEmpty || roleVal == 'Não definido') {
+                    await FirebaseFirestore.instance.collection('users').doc(cleanCPF).update({
+                      'status': 'Ativo',
+                      if (typeVal.isEmpty) 'type': 'prestador',
+                      if (roleVal.isEmpty || roleVal == 'Não definido') 'role': 'worker',
+                    });
+                    docData['status'] = 'Ativo';
+                    if (typeVal.isEmpty) docData['type'] = 'prestador';
+                    if (roleVal.isEmpty || roleVal == 'Não definido') docData['role'] = 'worker';
+                  }
+
                   fields = {};
                   docData.forEach((key, value) {
                     fields![key] = {'stringValue': value?.toString() ?? ''};
@@ -136,6 +153,9 @@ class AuthModals {
                     return;
                   }
 
+                  final typeVal = docData['type']?.toString() ?? '';
+                  final roleVal = docData['role']?.toString() ?? '';
+
                   // Credenciais locais válidas! Migra para o Firebase Auth
                   final newCred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
                     email: email,
@@ -149,11 +169,17 @@ class AuthModals {
                   await FirebaseFirestore.instance.collection('users').doc(cleanCPF).update({
                     'authUid': authUid,
                     'password': hashedPassword,
+                    'status': 'Ativo',
+                    if (typeVal.isEmpty) 'type': 'prestador',
+                    if (roleVal.isEmpty || roleVal == 'Não definido') 'role': 'worker',
                   });
 
                   // Atualiza localmente a representação dos dados
                   fields['authUid'] = {'stringValue': authUid};
                   fields['password'] = {'stringValue': hashedPassword};
+                  fields['status'] = {'stringValue': 'Ativo'};
+                  if (typeVal.isEmpty) fields['type'] = {'stringValue': 'prestador'};
+                  if (roleVal.isEmpty || roleVal == 'Não definido') fields['role'] = {'stringValue': 'worker'};
                 }
 
                 // Salva os dados na sessão local do navegador

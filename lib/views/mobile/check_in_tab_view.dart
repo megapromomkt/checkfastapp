@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import '../../core/constants/premium_theme.dart';
 import 'dart:async';
 import 'dart:typed_data';
@@ -12,6 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
+import 'package:firebase_storage/firebase_storage.dart';
 
 class CheckInTabView extends StatefulWidget {
   final bool isDesktop;
@@ -42,10 +44,121 @@ class _CheckInTabViewState extends State<CheckInTabView> {
   bool _isLoadingApp = true;
   String _errorMessage = '';
 
+  // Promoter settings loaded from database
+  bool _enforceGeolocation = true;
+  bool _enforcePhoto = true;
+  bool _allowGallery = false;
+  List<String> _bypassCpfs = [];
+
   @override
   void initState() {
     super.initState();
     _loadActiveApplication();
+  }
+
+  DateTime _getDemandEndDate(String dateStr) {
+    try {
+      if (dateStr.contains(' - ')) {
+        final parts = dateStr.split(' - ');
+        final part = parts[1].trim();
+        if (part.contains('/')) {
+          final dateParts = part.split('/');
+          final day = int.parse(dateParts[0]);
+          final month = int.parse(dateParts[1]);
+          final year = dateParts.length > 2 ? int.parse(dateParts[2]) : DateTime.now().year;
+          return DateTime(year, month, day);
+        }
+      } else {
+        final part = dateStr.trim();
+        if (part.contains('/')) {
+          final dateParts = part.split('/');
+          final day = int.parse(dateParts[0]);
+          final month = int.parse(dateParts[1]);
+          final year = dateParts.length > 2 ? int.parse(dateParts[2]) : DateTime.now().year;
+          return DateTime(year, month, day);
+        }
+      }
+    } catch (_) {}
+    return DateTime.now().subtract(const Duration(days: 10));
+  }
+
+  DateTime _getNextBusinessDay(DateTime date) {
+    DateTime next = date.add(const Duration(days: 1));
+    while (next.weekday == DateTime.saturday || next.weekday == DateTime.sunday) {
+      next = next.add(const Duration(days: 1));
+    }
+    return next;
+  }
+
+  DateTime? _parseFlexibleDate(String dateStr) {
+    final str = dateStr.trim();
+    if (str.isEmpty) return null;
+    try {
+      if (str.contains('-')) {
+        final parts = str.split('-');
+        if (parts.length == 3) {
+          final y = int.parse(parts[0]);
+          final m = int.parse(parts[1]);
+          final d = int.parse(parts[2]);
+          return DateTime(y, m, d);
+        }
+      }
+    } catch (_) {}
+    try {
+      if (str.contains('/')) {
+        final parts = str.split('/');
+        if (parts.length >= 2) {
+          final d = int.parse(parts[0]);
+          final m = int.parse(parts[1]);
+          int y = DateTime.now().year;
+          if (parts.length == 3) {
+            y = int.parse(parts[2]);
+            if (y < 100) {
+              y += 2000;
+            }
+          }
+          return DateTime(y, m, d);
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  bool _isToday(String dateStr) {
+    if (dateStr.isEmpty) return false;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    final cleaned = dateStr.trim();
+    if (cleaned.contains(' - ')) {
+      final parts = cleaned.split(' - ');
+      if (parts.length == 2) {
+        final start = _parseFlexibleDate(parts[0]);
+        final end = _parseFlexibleDate(parts[1]);
+        if (start != null && end != null) {
+          return (today.isAfter(start) || today.isAtSameMomentAs(start)) &&
+                 (today.isBefore(end) || today.isAtSameMomentAs(end));
+        }
+      }
+    }
+
+    final dateVal = _parseFlexibleDate(cleaned);
+    if (dateVal != null) {
+      return dateVal.year == today.year && dateVal.month == today.month && dateVal.day == today.day;
+    }
+
+    final todayStr1 = DateFormat("yyyy-MM-dd").format(now);
+    final todayStr2 = DateFormat("dd/MM/yyyy").format(now);
+    final todayStr3 = DateFormat("dd/MM/yy").format(now);
+    final todayStr4 = DateFormat("dd/MM").format(now);
+
+    return dateStr.contains(todayStr1) ||
+           dateStr.contains(todayStr2) ||
+           dateStr.contains(todayStr3) ||
+           dateStr.contains(todayStr4) ||
+           todayStr2.contains(dateStr) ||
+           todayStr3.contains(dateStr) ||
+           todayStr4.contains(dateStr);
   }
 
   Future<void> _loadActiveApplication() async {
@@ -58,15 +171,58 @@ class _CheckInTabViewState extends State<CheckInTabView> {
       final snap = await FirebaseFirestore.instance
           .collection('applications')
           .where('promoterCpf', isEqualTo: widget.userCpf)
-          .orderBy('submittedAt', descending: true)
           .get();
 
-      Map<String, dynamic>? active;
-      for (final doc in snap.docs) {
-        final data = doc.data();
-        final status = data['status']?.toString() ?? '';
+      final docs = snap.docs.toList();
+      docs.sort((a, b) {
+        final aData = a.data() as Map<String, dynamic>;
+        final bData = b.data() as Map<String, dynamic>;
         
-        if (status == 'tarefa_aprovada' || status == 'em_andamento' || status == 'em_analise' || status == 'liberado_pagamento' || status == 'pago' || status == 'nao_aprovada') {
+        final aStatus = aData['status']?.toString() ?? '';
+        final bStatus = bData['status']?.toString() ?? '';
+        
+        // Prioritize in-progress statuses
+        final aIsActiveWork = (aStatus == 'em_andamento' || aStatus == 'em_analise');
+        final bIsActiveWork = (bStatus == 'em_andamento' || bStatus == 'em_analise');
+        
+        if (aIsActiveWork && !bIsActiveWork) return -1;
+        if (!aIsActiveWork && bIsActiveWork) return 1;
+        
+        // Next, prioritize today's dates
+        final aDateStr = aData['date']?.toString() ?? '';
+        final bDateStr = bData['date']?.toString() ?? '';
+        final aIsToday = _isToday(aDateStr);
+        final bIsToday = _isToday(bDateStr);
+        
+        if (aIsToday && !bIsToday) return -1;
+        if (!aIsToday && bIsToday) return 1;
+        
+        // Fallback to submittedAt descending
+        final aTime = aData['submittedAt']?.toString() ?? '';
+        final bTime = bData['submittedAt']?.toString() ?? '';
+        return bTime.compareTo(aTime);
+      });
+
+      Map<String, dynamic>? active;
+      for (final doc in docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final status = data['status']?.toString() ?? '';
+
+        // Hide if past next business day
+        final dateStr = data['date']?.toString() ?? '';
+        if (dateStr.isNotEmpty) {
+          final endDate = _getDemandEndDate(dateStr);
+          final nextBusDay = _getNextBusinessDay(endDate);
+          final today = DateTime.now();
+          final todayDateOnly = DateTime(today.year, today.month, today.day);
+          
+          if (todayDateOnly.isAfter(nextBusDay) || todayDateOnly.isAtSameMomentAs(nextBusDay)) {
+            // Hide this application from the active screen
+            continue;
+          }
+        }
+        
+        if (status == 'tarefa_aprovada' || status == 'aprovado' || status == 'selecionado' || status == 'treinamento' || status == 'em_andamento' || status == 'em_analise' || status == 'liberado_pagamento' || status == 'pago' || status == 'nao_aprovada') {
           active = {
             'id': doc.id,
             'storeName':   data['storeName']?.toString() ?? '',
@@ -84,6 +240,20 @@ class _CheckInTabViewState extends State<CheckInTabView> {
           };
           break;
         }
+      }
+      
+      // Fetch promoter settings
+      try {
+        final settingsDoc = await FirebaseFirestore.instance.collection('app_settings').doc('promoter_settings').get();
+        if (settingsDoc.exists && settingsDoc.data() != null) {
+          final sData = settingsDoc.data()!;
+          _enforceGeolocation = sData['enforceGeolocation'] ?? true;
+          _enforcePhoto = sData['enforcePhoto'] ?? true;
+          _allowGallery = sData['allowGallery'] ?? false;
+          _bypassCpfs = List<String>.from(sData['bypassCpfs'] ?? []);
+        }
+      } catch (e) {
+        print('Erro ao carregar configurações no check-in: $e');
       }
       
       if (mounted) {
@@ -124,6 +294,19 @@ class _CheckInTabViewState extends State<CheckInTabView> {
 
   Future<void> _verifyLocation() async {
     setState(() => _isLoadingLocation = true);
+
+    final bool bypass = widget.userCpf == '43221002874' ||
+        !_enforceGeolocation ||
+        _bypassCpfs.contains(widget.userCpf);
+
+    if (bypass) {
+      HapticFeedback.mediumImpact();
+      setState(() {
+        _isLoadingLocation = false;
+        _isLocationVerified = true;
+      });
+      return;
+    }
     
     bool serviceEnabled;
     LocationPermission permission;
@@ -183,6 +366,10 @@ class _CheckInTabViewState extends State<CheckInTabView> {
   }
 
   Future<void> _takePhoto() async {
+    _pickImageFlow(false);
+  }
+
+  Future<void> _takePhotoDirect(ImageSource source) async {
     if (_photos.length >= 3) {
       _showError('Você já tirou o limite de 3 fotos.');
       return;
@@ -190,7 +377,7 @@ class _CheckInTabViewState extends State<CheckInTabView> {
     
     try {
       final XFile? photo = await _picker.pickImage(
-        source: ImageSource.camera,
+        source: source,
         imageQuality: 70,
       );
 
@@ -203,7 +390,7 @@ class _CheckInTabViewState extends State<CheckInTabView> {
         _showCheckInConfirmation();
       }
     } catch (e) {
-      _showError('Não foi possível acessar a câmera do navegador.');
+      _showError('Não foi possível acessar a câmera ou galeria do navegador.');
     }
   }
 
@@ -214,7 +401,8 @@ class _CheckInTabViewState extends State<CheckInTabView> {
       if (image == null) return file;
 
       final dateStr = DateTime.now().toString().substring(0, 16);
-      final text = "CheckFast | $dateStr | Local Valido";
+      final storeName = _activeApplication?['storeName'] ?? 'Loja';
+      final text = "$storeName | $dateStr";
 
       // Desenha uma barra preta no fundo para dar contraste
       img.fillRect(image, x1: 0, y1: image.height - 50, x2: image.width, y2: image.height, color: img.ColorRgba8(0, 0, 0, 150));
@@ -231,7 +419,7 @@ class _CheckInTabViewState extends State<CheckInTabView> {
   }
 
   Future<void> _submitCheckIn() async {
-    if (_photos.isEmpty) {
+    if (_enforcePhoto && _photos.isEmpty) {
       _showError('Tire pelo menos uma foto para confirmar.');
       return;
     }
@@ -245,12 +433,36 @@ class _CheckInTabViewState extends State<CheckInTabView> {
     final now = DateTime.now().toIso8601String();
     
     try {
-      // Envia via SDK do Firestore (evita cota de API REST e token manual)
-      await FirebaseFirestore.instance.collection('applications').doc(_activeApplication!['id']).update({
+      // 1. Enviar fotos para o Firebase Storage
+      final List<String> checkInUrls = [];
+      final appId = _activeApplication!['id'];
+      for (int i = 0; i < _photos.length; i++) {
+        final photo = _photos[i];
+        final bytes = await photo.readAsBytes();
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final pathRef = 'attendances/$appId/checkin_photo_${i}_$timestamp.jpg';
+        final storageRef = FirebaseStorage.instance.ref().child(pathRef);
+        final uploadTask = storageRef.putData(bytes, SettableMetadata(contentType: 'image/jpeg'));
+        final snap = await uploadTask;
+        final url = await snap.ref.getDownloadURL();
+        checkInUrls.add(url);
+      }
+
+      // 2. Envia via SDK do Firestore (evita cota de API REST e token manual)
+      await FirebaseFirestore.instance.collection('applications').doc(appId).update({
         'status': 'em_andamento',
         'checkInTime': now,
         'updatedAt': now,
+        'checkInPhotos': checkInUrls,
       });
+
+      // Update demand status to EM ANDAMENTO
+      final demandId = _activeApplication!['demandId'];
+      if (demandId != null && demandId.toString().isNotEmpty) {
+        await FirebaseFirestore.instance.collection('demands').doc(demandId).update({
+          'status': 'EM ANDAMENTO',
+        });
+      }
       
       HapticFeedback.heavyImpact();
       
@@ -378,8 +590,16 @@ class _CheckInTabViewState extends State<CheckInTabView> {
                         label: 'CHECK-IN',
                         icon: IconsaxPlusLinear.login,
                         color: _isCheckedIn ? AppColors.success : AppColors.primaryBlue,
-                        isActive: !_isCheckedIn && _activeApplication != null && _activeApplication!['status'] == 'tarefa_aprovada',
-                        onPressed: (_isCheckedIn || _activeApplication == null || _activeApplication!['status'] != 'tarefa_aprovada') ? null : _verifyLocationAndCheckIn,
+                        isActive: !_isCheckedIn && _activeApplication != null && 
+                            (_activeApplication!['status'] == 'tarefa_aprovada' || 
+                             _activeApplication!['status'] == 'aprovado' || 
+                             _activeApplication!['status'] == 'selecionado' || 
+                             _activeApplication!['status'] == 'treinamento'),
+                        onPressed: (_isCheckedIn || _activeApplication == null || 
+                            !(_activeApplication!['status'] == 'tarefa_aprovada' || 
+                              _activeApplication!['status'] == 'aprovado' || 
+                              _activeApplication!['status'] == 'selecionado' || 
+                              _activeApplication!['status'] == 'treinamento')) ? null : _verifyLocationAndCheckIn,
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -540,7 +760,11 @@ class _CheckInTabViewState extends State<CheckInTabView> {
   void _verifyLocationAndCheckIn() async {
     _verifyLocation().then((_) {
       if (_isLocationVerified) {
-        _takePhoto();
+        if (_enforcePhoto) {
+          _takePhoto();
+        } else {
+          _showCheckInConfirmDialog();
+        }
       }
     });
   }
@@ -548,12 +772,82 @@ class _CheckInTabViewState extends State<CheckInTabView> {
   void _verifyLocationAndCheckout() async {
     _verifyLocation().then((_) {
       if (_isLocationVerified) {
-        _takeCheckoutPhoto();
+        if (_enforcePhoto) {
+          _takeCheckoutPhoto();
+        } else {
+          _showCheckoutConfirmDialog();
+        }
       }
     });
   }
 
+  void _showCheckInConfirmDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Realizar Check-in'),
+        content: const Text('Deseja registrar o check-in na loja? Você pode tirar fotos de comprovante (opcional) ou registrar diretamente.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _takePhoto();
+            },
+            child: const Text('Tirar Foto', style: TextStyle(color: AppColors.primaryBlue)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _submitCheckIn();
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.success, foregroundColor: Colors.white),
+            child: const Text('Registrar Entrada'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showCheckoutConfirmDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Realizar Checkout'),
+        content: const Text('Deseja registrar o checkout da loja? Você pode tirar fotos de comprovante (opcional) ou registrar diretamente.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _takeCheckoutPhoto();
+            },
+            child: const Text('Tirar Foto', style: TextStyle(color: AppColors.primaryBlue)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _submitCheckout();
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white),
+            child: const Text('Registrar Saída'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _takeCheckoutPhoto() async {
+    _pickImageFlow(true);
+  }
+
+  Future<void> _takeCheckoutPhotoDirect(ImageSource source) async {
     if (_checkoutPhotos.length >= 3) {
       _showError('Você já tirou o limite de 3 fotos de checkout.');
       return;
@@ -561,7 +855,7 @@ class _CheckInTabViewState extends State<CheckInTabView> {
     
     try {
       final XFile? photo = await _picker.pickImage(
-        source: ImageSource.camera,
+        source: source,
         imageQuality: 70,
       );
 
@@ -575,8 +869,56 @@ class _CheckInTabViewState extends State<CheckInTabView> {
         _showCheckoutConfirmation();
       }
     } catch (e) {
-      _showError('Não foi possível acessar a câmera do navegador.');
+      _showError('Não foi possível acessar a câmera ou galeria do navegador.');
     }
+  }
+
+  void _pickImageFlow(bool isCheckout) {
+    if (!_allowGallery) {
+      if (isCheckout) {
+        _takeCheckoutPhotoDirect(ImageSource.camera);
+      } else {
+        _takePhotoDirect(ImageSource.camera);
+      }
+      return;
+    }
+    
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_rounded, color: AppColors.primaryBlue),
+              title: const Text('Tirar Foto (Câmera)'),
+              onTap: () {
+                Navigator.pop(context);
+                if (isCheckout) {
+                  _takeCheckoutPhotoDirect(ImageSource.camera);
+                } else {
+                  _takePhotoDirect(ImageSource.camera);
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded, color: AppColors.primaryBlue),
+              title: const Text('Escolher da Galeria'),
+              onTap: () {
+                Navigator.pop(context);
+                if (isCheckout) {
+                  _takeCheckoutPhotoDirect(ImageSource.gallery);
+                } else {
+                  _takePhotoDirect(ImageSource.gallery);
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showCheckInConfirmation() {
@@ -636,7 +978,7 @@ class _CheckInTabViewState extends State<CheckInTabView> {
   }
 
   Future<void> _submitCheckout() async {
-    if (_checkoutPhotos.isEmpty) {
+    if (_enforcePhoto && _checkoutPhotos.isEmpty) {
       _showError('Tire pelo menos uma foto para confirmar o checkout.');
       return;
     }
@@ -649,11 +991,27 @@ class _CheckInTabViewState extends State<CheckInTabView> {
     final now = DateTime.now().toIso8601String();
     
     try {
-      // Envia via SDK do Firestore (evita cota de API REST e token manual)
-      await FirebaseFirestore.instance.collection('applications').doc(_activeApplication!['id']).update({
+      // 1. Enviar fotos de checkout para o Firebase Storage
+      final List<String> checkOutUrls = [];
+      final appId = _activeApplication!['id'];
+      for (int i = 0; i < _checkoutPhotos.length; i++) {
+        final photo = _checkoutPhotos[i];
+        final bytes = await photo.readAsBytes();
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final pathRef = 'attendances/$appId/checkout_photo_${i}_$timestamp.jpg';
+        final storageRef = FirebaseStorage.instance.ref().child(pathRef);
+        final uploadTask = storageRef.putData(bytes, SettableMetadata(contentType: 'image/jpeg'));
+        final snap = await uploadTask;
+        final url = await snap.ref.getDownloadURL();
+        checkOutUrls.add(url);
+      }
+
+      // 2. Envia via SDK do Firestore (evita cota de API REST e token manual)
+      await FirebaseFirestore.instance.collection('applications').doc(appId).update({
         'status': 'em_analise',
         'checkOutTime': now,
         'updatedAt': now,
+        'checkOutPhotos': checkOutUrls,
       });
 
       _timer?.cancel();

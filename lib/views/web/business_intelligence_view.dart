@@ -8,6 +8,7 @@ import 'financial_module_view.dart';
 import 'clients_management_view.dart';
 import 'demands_management_view.dart';
 import 'presence_control_view.dart';
+import 'photos_gallery_view.dart';
 
 class BusinessIntelligenceView extends StatefulWidget {
   const BusinessIntelligenceView({super.key});
@@ -27,6 +28,7 @@ class _BusinessIntelligenceViewState extends State<BusinessIntelligenceView> {
     const DemandsManagementView(),
     const TrainingModule(),
     const PresenceControlView(),
+    const PhotosGalleryView(),
     const FinancialModuleView(),
     const ReportModule(),
     const GenericModule(title: 'Configurações'),
@@ -67,9 +69,10 @@ class _BusinessIntelligenceViewState extends State<BusinessIntelligenceView> {
                 _buildMenuItem(4, Icons.assignment_outlined, 'Demandas'),
                 _buildMenuItem(5, Icons.model_training_outlined, 'Treinamento'),
                 _buildMenuItem(6, Icons.how_to_reg_outlined, 'Presença'),
-                _buildMenuItem(7, Icons.payments_outlined, 'Financeiro'),
-                _buildMenuItem(8, Icons.description_outlined, 'Relatórios'),
-                _buildMenuItem(9, Icons.settings_outlined, 'Configurações'),
+                _buildMenuItem(7, Icons.camera_alt_outlined, 'Fotos'),
+                _buildMenuItem(8, Icons.payments_outlined, 'Financeiro'),
+                _buildMenuItem(9, Icons.description_outlined, 'Relatórios'),
+                _buildMenuItem(10, Icons.settings_outlined, 'Configurações'),
               ],
             ),
           ),
@@ -135,6 +138,7 @@ class BIContent extends StatefulWidget {
 }
 
 class _BIContentState extends State<BIContent> {
+  late final Stream<QuerySnapshot<Map<String, dynamic>>> _demandsStream;
   late final Stream<QuerySnapshot<Map<String, dynamic>>> _appsStream;
   late final Stream<QuerySnapshot<Map<String, dynamic>>> _usersStream;
   late final Stream<QuerySnapshot<Map<String, dynamic>>> _storesStream;
@@ -143,6 +147,7 @@ class _BIContentState extends State<BIContent> {
   @override
   void initState() {
     super.initState();
+    _demandsStream = FirebaseFirestore.instance.collection('demands').snapshots();
     _appsStream = FirebaseFirestore.instance.collection('applications').snapshots();
     _usersStream = FirebaseFirestore.instance.collection('users').snapshots();
     _storesStream = FirebaseFirestore.instance.collection('stores').snapshots();
@@ -165,94 +170,129 @@ class _BIContentState extends State<BIContent> {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: _appsStream,
-      builder: (context, appsSnapshot) {
+      stream: _demandsStream,
+      builder: (context, demandsSnapshot) {
         return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: _usersStream,
-          builder: (context, usersSnapshot) {
+          stream: _appsStream,
+          builder: (context, appsSnapshot) {
             return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: _storesStream,
-              builder: (context, storesSnapshot) {
+              stream: _usersStream,
+              builder: (context, usersSnapshot) {
                 return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                  stream: _chatsStream,
-                  builder: (context, chatsSnapshot) {
-                    if (appsSnapshot.connectionState == ConnectionState.waiting ||
-                        usersSnapshot.connectionState == ConnectionState.waiting ||
-                        storesSnapshot.connectionState == ConnectionState.waiting ||
-                        chatsSnapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(
-                        child: CircularProgressIndicator(color: AppColors.primaryBlue),
-                      );
-                    }
+                  stream: _storesStream,
+                  builder: (context, storesSnapshot) {
+                    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                      stream: _chatsStream,
+                      builder: (context, chatsSnapshot) {
+                        if (demandsSnapshot.connectionState == ConnectionState.waiting ||
+                            appsSnapshot.connectionState == ConnectionState.waiting ||
+                            usersSnapshot.connectionState == ConnectionState.waiting ||
+                            storesSnapshot.connectionState == ConnectionState.waiting ||
+                            chatsSnapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(color: AppColors.primaryBlue),
+                          );
+                        }
 
-                    final appsDocs = appsSnapshot.data?.docs ?? [];
-                    final usersDocs = usersSnapshot.data?.docs ?? [];
-                    final storesDocs = storesSnapshot.data?.docs ?? [];
-                    final chatsDocs = chatsSnapshot.data?.docs ?? [];
+                        final demandsDocs = demandsSnapshot.data?.docs ?? [];
+                        final appsDocs = appsSnapshot.data?.docs ?? [];
+                        final usersDocs = usersSnapshot.data?.docs ?? [];
+                        final chatsDocs = chatsSnapshot.data?.docs ?? [];
 
-                    // 1. Big Numbers:
-                    // Diárias Pagas
-                    double paidTotal = 0;
-                    // Diárias Pendentes
-                    double pendingTotal = 0;
-                    // Taxa de Validação (approved / (approved + notApproved))
-                    int approvedCount = 0;
-                    int notApprovedCount = 0;
+                        final Map<String, String> demandStatuses = {};
+                        for (var doc in demandsDocs) {
+                          final data = doc.data();
+                          final status = (data['status'] ?? '').toString().toUpperCase();
+                          demandStatuses[doc.id] = status;
+                        }
 
-                    for (var doc in appsDocs) {
-                      final data = doc.data();
-                      final status = data['status'] ?? '';
-                      final valNum = data['value'];
-                      double val = 0.0;
-                      if (valNum is num) {
-                        val = valNum.toDouble();
-                      }
+                        // 1. Big Numbers:
+                        // New shift metrics
+                        int closedShiftsCount = 0;
+                        int openShiftsCount = 0;
+                        int trainingPromotersCount = 0;
+                        int inStorePromotersCount = 0;
 
-                      if (status == 'pago') {
-                        paidTotal += val;
-                        approvedCount++;
-                      } else if (status == 'liberado_pagamento') {
-                        pendingTotal += val;
-                        approvedCount++;
-                      } else if (status == 'nao_aprovada') {
-                        notApprovedCount++;
-                      }
-                    }
+                        for (var doc in appsDocs) {
+                          final data = doc.data();
+                          final status = data['status'] ?? '';
+                          final checkInTime = data['checkInTime'] ?? '';
+                          final checkOutTime = data['checkOutTime'] ?? '';
+                          final demandId = data['demandId'] ?? '';
+                          final demandStatus = demandStatuses[demandId] ?? '';
+                          final isParentOpenOrFilled = demandStatus == 'ABERTAS' || demandStatus == 'PREENCHIDAS';
 
-                    double validationRate = 100.0;
-                    final totalVal = approvedCount + notApprovedCount;
-                    if (totalVal > 0) {
-                      validationRate = (approvedCount / totalVal) * 100;
-                    }
+                          if (status == 'pago' || status == 'liberado_pagamento') {
+                            closedShiftsCount++;
+                          } else if (isParentOpenOrFilled &&
+                                     (status == 'tarefa_aprovada' ||
+                                      status == 'inscricao_enviada' ||
+                                      status == 'em_andamento' ||
+                                      status == 'em_analise')) {
+                            openShiftsCount++;
+                          } else if (status == 'treinamento') {
+                            trainingPromotersCount++;
+                          }
 
-                    // Lojas Ativas
-                    final storesCount = storesDocs.length;
+                          // Prestador em loja (Checked-in and not checked out)
+                          if ((checkInTime.toString().isNotEmpty || status == 'em_andamento') &&
+                              checkOutTime.toString().isEmpty) {
+                            inStorePromotersCount++;
+                          }
+                        }
 
-                    // Cadastros Prestador (users where type == 'prestador')
-                    int promoterCount = 0;
-                    final Map<String, String> promoterNames = {};
-                    for (var doc in usersDocs) {
-                      final data = doc.data();
-                      final type = data['type'] ?? '';
-                      if (type == 'prestador') {
-                        promoterCount++;
-                      }
-                      final name = data['name'] ?? '';
-                      if (name.isNotEmpty) {
-                        promoterNames[doc.id] = name;
-                      }
-                    }
+                        double closurePercentage = 0.0;
+                        final totalShifts = closedShiftsCount + openShiftsCount;
+                        if (totalShifts > 0) {
+                          closurePercentage = (closedShiftsCount / totalShifts) * 100;
+                        }
 
-                    // Mensagens não lidas
-                    int totalUnreadChats = 0;
-                    int activeChatsCount = 0;
-                    for (var doc in chatsDocs) {
-                      final unread = doc.data()['unreadCountAdmin'] ?? 0;
-                      if (unread is num && unread > 0) {
-                        totalUnreadChats += unread.toInt();
-                        activeChatsCount++;
-                      }
-                    }
+                        // Cadastros Prestador & Blocked Promoters
+                        int promoterCount = 0;
+                        int blockedPromotersCount = 0;
+                        final Map<String, String> promoterNames = {};
+                        for (var doc in usersDocs) {
+                          final data = doc.data();
+                          final type = (data['type'] ?? '').toString().toLowerCase();
+                          final role = (data['role'] ?? '').toString().toLowerCase();
+                          final hasCv = data['curriculumResumo'] != null || data['curriculum_resumo'] != null;
+                          final authUid = (data['authUid'] ?? '').toString();
+
+                          final isInternalOrRede = type == 'interno' || type == 'rede' || role == 'admin' || role == 'regional';
+                          final isPromoter = !isInternalOrRede && (type == 'prestador' || role == 'worker' || role == 'prestador' || hasCv || authUid.isNotEmpty);
+                          if (isPromoter) {
+                            promoterCount++;
+                            final isBlocked = data['isBlocked'] ?? data['is_blocked'] ?? false;
+                            if (isBlocked == true) {
+                              blockedPromotersCount++;
+                            }
+                          }
+                          final name = data['name'] ?? '';
+                          if (name.isNotEmpty) {
+                            promoterNames[doc.id] = name;
+                          }
+                        }
+
+                        // Total active demands
+                        int activeDemandsCount = 0;
+                        for (var doc in demandsDocs) {
+                          final data = doc.data();
+                          final status = (data['status'] ?? '').toString().toUpperCase();
+                          if (status != 'FINALIZADAS' && status != 'CANCELADA' && status != 'RASCUNHO') {
+                            activeDemandsCount++;
+                          }
+                        }
+
+                        // Mensagens não lidas
+                        int totalUnreadChats = 0;
+                        int activeChatsCount = 0;
+                        for (var doc in chatsDocs) {
+                          final unread = doc.data()['unreadCountAdmin'] ?? 0;
+                          if (unread is num && unread > 0) {
+                            totalUnreadChats += unread.toInt();
+                            activeChatsCount++;
+                          }
+                        }
 
                     // 2. Bar Chart & Pie Chart & validation rates over last 7 days:
                     final now = DateTime.now();
@@ -456,22 +496,35 @@ class _BIContentState extends State<BIContent> {
 
                           const SizedBox(height: 32),
                           
-                          // Big Numbers (6 cards)
-                          GridView.count(
-                            crossAxisCount: 6,
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            crossAxisSpacing: 15,
-                            mainAxisSpacing: 15,
-                            childAspectRatio: 1.5,
-                            children: [
-                              _buildBigNumberCard('Diárias Pagas', _formatCurrency(paidTotal), Icons.payments, AppColors.success, 'Pago'),
-                              _buildBigNumberCard('Lojas Ativas', '$storesCount', Icons.storefront, AppColors.primaryBlue, 'Cadastradas'),
-                              _buildBigNumberCard('Cadastros Prestador', '$promoterCount', Icons.people, AppColors.warning, 'Total'),
-                              _buildBigNumberCard('Diárias Pendentes', _formatCurrency(pendingTotal), Icons.hourglass_empty, Colors.purple, 'Em liberação'),
-                              _buildBigNumberCard('Taxa de Validação', '${validationRate.toStringAsFixed(1).replaceAll('.', ',')}%', Icons.fact_check, Colors.teal, 'Aprovação'),
-                              _buildBigNumberCard('Mensagens Não Lidas', '$totalUnreadChats', Icons.chat_bubble_outline_rounded, Colors.blueGrey, '$activeChatsCount chats ativos'),
-                            ],
+                          // Big Numbers (9 cards)
+                          LayoutBuilder(
+                            builder: (context, constraints) {
+                              int crossCount = 3;
+                              if (constraints.maxWidth > 1400) {
+                                crossCount = 5;
+                              } else if (constraints.maxWidth > 900) {
+                                crossCount = 4;
+                              }
+                              return GridView.count(
+                                crossAxisCount: crossCount,
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                crossAxisSpacing: 15,
+                                mainAxisSpacing: 15,
+                                childAspectRatio: 1.5,
+                                children: [
+                                  _buildBigNumberCard('Total de Demandas Ativas', '$activeDemandsCount', Icons.assignment_turned_in, AppColors.primaryBlue, 'Em andamento'),
+                                  _buildBigNumberCard('Cadastros de Prestadores', '$promoterCount', Icons.people, AppColors.warning, 'Total no sistema'),
+                                  _buildBigNumberCard('Total de Diárias Fechadas', '$closedShiftsCount', Icons.check_circle, AppColors.success, 'Pagas / Liberadas'),
+                                  _buildBigNumberCard('Total de Diárias em Aberto', '$openShiftsCount', Icons.hourglass_empty, Colors.orange, 'Aguardando fechamento'),
+                                  _buildBigNumberCard('% do Fechamento de Diária', '${closurePercentage.toStringAsFixed(1).replaceAll('.', ',')}%', Icons.percent, Colors.teal, 'Eficiência de fechamento'),
+                                  _buildBigNumberCard('Prestadores em Treinamento', '$trainingPromotersCount', Icons.school, Colors.purpleAccent, 'Integração ativa'),
+                                  _buildBigNumberCard('Prestadores em Loja', '$inStorePromotersCount', Icons.storefront, Colors.blue, 'Checked-in ativos'),
+                                  _buildBigNumberCard('Prestadores Bloqueados', '$blockedPromotersCount', Icons.block, Colors.redAccent, 'Restritos no sistema'),
+                                  _buildBigNumberCard('Total de Mensagens Não Lidas', '$totalUnreadChats', Icons.mark_chat_unread, Colors.blueGrey, '$activeChatsCount chats ativos'),
+                                ],
+                              );
+                            }
                           ),
                           const SizedBox(height: 32),
                           
@@ -667,6 +720,8 @@ class _BIContentState extends State<BIContent> {
                           ),
                         ],
                       ),
+                    );
+                      },
                     );
                   },
                 );

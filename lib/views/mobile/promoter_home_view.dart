@@ -924,10 +924,15 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
                   stream: FirebaseFirestore.instance
                       .collection('notifications')
                       .where('recipientCpf', isEqualTo: _userCpf)
-                      .orderBy('createdAt', descending: true)
                       .snapshots(),
                   builder: (context, snapshot) {
-                    final docs = snapshot.data?.docs ?? [];
+                    final unsortedDocs = snapshot.data?.docs ?? [];
+                    final docs = unsortedDocs.toList();
+                    docs.sort((a, b) {
+                      final aTime = (a.data() as Map<String, dynamic>)['createdAt']?.toString() ?? '';
+                      final bTime = (b.data() as Map<String, dynamic>)['createdAt']?.toString() ?? '';
+                      return bTime.compareTo(aTime);
+                    });
                     
                     final activeNotifications = docs.where((doc) {
                       final data = doc.data() as Map<String, dynamic>;
@@ -1936,6 +1941,40 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
 
   // 3. TELA TAREFAS
   Widget _buildTarefasTab(bool isDesktop) {
+    DateTime getDemandEndDate(String dateStr) {
+      try {
+        if (dateStr.contains(' - ')) {
+          final parts = dateStr.split(' - ');
+          final part = parts[1].trim();
+          if (part.contains('/')) {
+            final dateParts = part.split('/');
+            final day = int.parse(dateParts[0]);
+            final month = int.parse(dateParts[1]);
+            final year = dateParts.length > 2 ? int.parse(dateParts[2]) : DateTime.now().year;
+            return DateTime(year, month, day);
+          }
+        } else {
+          final part = dateStr.trim();
+          if (part.contains('/')) {
+            final dateParts = part.split('/');
+            final day = int.parse(dateParts[0]);
+            final month = int.parse(dateParts[1]);
+            final year = dateParts.length > 2 ? int.parse(dateParts[2]) : DateTime.now().year;
+            return DateTime(year, month, day);
+          }
+        }
+      } catch (_) {}
+      return DateTime.now().subtract(const Duration(days: 10));
+    }
+
+    DateTime getNextBusinessDay(DateTime date) {
+      DateTime next = date.add(const Duration(days: 1));
+      while (next.weekday == DateTime.saturday || next.weekday == DateTime.sunday) {
+        next = next.add(const Duration(days: 1));
+      }
+      return next;
+    }
+
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('applications')
@@ -1950,7 +1989,25 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
         final taskApps = docs.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
           final status = data['status'] ?? '';
+
+          // Hide if past next business day
+          final dateStr = data['date']?.toString() ?? '';
+          if (dateStr.isNotEmpty) {
+            final endDate = getDemandEndDate(dateStr);
+            final nextBusDay = getNextBusinessDay(endDate);
+            final today = DateTime.now();
+            final todayDateOnly = DateTime(today.year, today.month, today.day);
+            
+            if (todayDateOnly.isAfter(nextBusDay) || todayDateOnly.isAtSameMomentAs(nextBusDay)) {
+              // Hide this task from the promoter list
+              return false;
+            }
+          }
+
           return status == 'tarefa_aprovada' ||
+              status == 'aprovado' ||
+              status == 'selecionado' ||
+              status == 'treinamento' ||
               status == 'em_andamento' ||
               status == 'em_analise' ||
               status == 'liberado_pagamento' ||
@@ -2626,7 +2683,7 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
                 Expanded(child: _buildField('Telefone Secundário', _telSecundarioController)),
               ],
             ),
-            _buildField('WhatsApp', _whatsappController),
+            _buildField('WhatsApp *', _whatsappController),
             _buildField('LinkedIn', _linkedinController),
             _buildField('Instagram Profissional', _instagramController),
             const SizedBox(height: 12),
@@ -3659,7 +3716,17 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
 
   bool _checkJornadaUnlocked(Map<String, dynamic> app) {
     final status = app['status']?.toString() ?? '';
-    if (status != 'tarefa_aprovada') {
+    final letterGenerated = app['letterGenerated'] == true;
+    if (letterGenerated) {
+      return true; // Se a carta de apresentação já foi gerada pelo admin, libera a jornada imediatamente
+    }
+    
+    final isPendingCheckIn = status == 'tarefa_aprovada' || 
+                             status == 'aprovado' || 
+                             status == 'selecionado' || 
+                             status == 'treinamento';
+                             
+    if (!isPendingCheckIn) {
       // Se a jornada já iniciou ou concluiu, ou está sob análise, libera o acesso para consulta/checkout.
       return true;
     }
@@ -3710,16 +3777,25 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
       final snap = await FirebaseFirestore.instance
           .collection('applications')
           .where('promoterCpf', isEqualTo: _userCpf)
-          .orderBy('submittedAt', descending: true)
           .get();
+
+      final docs = snap.docs.toList();
+      docs.sort((a, b) {
+        final aTime = (a.data() as Map<String, dynamic>)['submittedAt']?.toString() ?? '';
+        final bTime = (b.data() as Map<String, dynamic>)['submittedAt']?.toString() ?? '';
+        return bTime.compareTo(aTime);
+      });
 
       bool unlocked = false;
       Map<String, dynamic>? active;
-      for (final doc in snap.docs) {
-        final data = doc.data();
+      for (final doc in docs) {
+        final data = doc.data() as Map<String, dynamic>;
         final status = data['status']?.toString() ?? '';
         
         if (status == 'tarefa_aprovada' || 
+            status == 'aprovado' || 
+            status == 'selecionado' || 
+            status == 'treinamento' || 
             status == 'em_andamento' || 
             status == 'em_analise' || 
             status == 'liberado_pagamento' || 
@@ -3730,6 +3806,7 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
             'status': status,
             'date': data['date']?.toString() ?? '',
             'timeRange': data['timeRange']?.toString() ?? '',
+            'letterGenerated': data['letterGenerated'] == true || data['letter_generated'] == true,
           };
           break;
         }
@@ -3960,6 +4037,15 @@ class _PromoterHomeViewState extends State<PromoterHomeView> {
   }
 
   void _salvarCurriculoCompleto(BuildContext context) async {
+    if (_whatsappController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ O campo WhatsApp/Celular é obrigatório!'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
     setState(() => _hasSavedCv = true);
     // Salvar currículo no Firestore
     try {

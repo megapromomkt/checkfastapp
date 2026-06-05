@@ -122,5 +122,11 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if isAdmin();
     }
+
+    // Regras para Configurações Gerais do App (app_settings)
+    match /app_settings/{documentId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
   }
 }

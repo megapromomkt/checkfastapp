@@ -286,6 +286,38 @@ class _AdmissionLettersViewState extends State<AdmissionLettersView> {
 
     if (pickedDate == null) return;
 
+    // Quando clica no gerar carta do prestador, liberar no ambiente do prestador a aba de jornada
+    if (_isAutoMode && _selectedAllocation != null) {
+      try {
+        await FirebaseFirestore.instance
+            .collection('applications')
+            .doc(_selectedAllocation!.applicationId)
+            .update({
+          'letterGenerated': true,
+          'letterGeneratedAt': DateTime.now().toIso8601String(),
+        });
+      } catch (e) {
+        print('Erro ao salvar flag de carta gerada: $e');
+      }
+    } else if (!_isAutoMode && _selectedPromoter != null && _selectedDemand != null) {
+      try {
+        final snap = await FirebaseFirestore.instance
+            .collection('applications')
+            .where('promoterCpf', isEqualTo: _selectedPromoter!.id)
+            .where('demandId', isEqualTo: _selectedDemand!.id)
+            .limit(1)
+            .get();
+        if (snap.docs.isNotEmpty) {
+          await snap.docs.first.reference.update({
+            'letterGenerated': true,
+            'letterGeneratedAt': DateTime.now().toIso8601String(),
+          });
+        }
+      } catch (e) {
+        print('Erro ao salvar flag de carta gerada manual: $e');
+      }
+    }
+
     final String formattedDate = DateFormat("dd/MM/yyyy").format(pickedDate);
     final String activityText = _isTrainingModeLetter
         ? "Treinamento Obrigatório Frente de Caixa"

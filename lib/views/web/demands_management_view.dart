@@ -13,6 +13,19 @@ import '../../models/register_models.dart';
 import '../../core/services/register_service.dart';
 import 'widgets/create_demand_modal.dart';
 
+DateTime getDemandEndDate(String dateStr) {
+  try {
+    if (dateStr.contains(' - ')) {
+      final parts = dateStr.split(' - ');
+      return DateFormat('dd/MM/yyyy').parse(parts[1].trim());
+    } else {
+      return DateFormat('dd/MM/yyyy').parse(dateStr.trim());
+    }
+  } catch (e) {
+    return DateTime.now().add(const Duration(days: 3));
+  }
+}
+
 class DemandsManagementView extends StatefulWidget {
   const DemandsManagementView({super.key});
 
@@ -25,6 +38,7 @@ class _DemandsManagementViewState extends State<DemandsManagementView> {
 
   // Search & Filters State
   String _searchQuery = '';
+  late final TextEditingController _searchQueryCtrl;
   String _filterClient = 'Todos';
   String _filterProject = 'Todos';
   String _filterRole = 'Todos';
@@ -39,10 +53,35 @@ class _DemandsManagementViewState extends State<DemandsManagementView> {
   AppDemand? _selectedDemandForVinculo;
   int _vinculoSubTab = 0;
   String _promoterSearchQuery = '';
+  late final TextEditingController _promoterSearchQueryCtrl;
   final ScrollController _horizontalDemandScrollController = ScrollController();
+
+  late final Stream<List<AppDemand>> _demandsStream;
+  late final Stream<QuerySnapshot> _usersStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchQueryCtrl = TextEditingController(text: _searchQuery);
+    _searchQueryCtrl.addListener(() {
+      setState(() {
+        _searchQuery = _searchQueryCtrl.text;
+      });
+    });
+    _promoterSearchQueryCtrl = TextEditingController(text: _promoterSearchQuery);
+    _promoterSearchQueryCtrl.addListener(() {
+      setState(() {
+        _promoterSearchQuery = _promoterSearchQueryCtrl.text;
+      });
+    });
+    _demandsStream = _api.getDemandsStream();
+    _usersStream = FirebaseFirestore.instance.collection('users').get().asStream();
+  }
 
   @override
   void dispose() {
+    _searchQueryCtrl.dispose();
+    _promoterSearchQueryCtrl.dispose();
     _horizontalDemandScrollController.dispose();
     super.dispose();
   }
@@ -589,13 +628,28 @@ class _DemandsManagementViewState extends State<DemandsManagementView> {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<AppDemand>>(
-      stream: _api.getDemandsStream(),
+      stream: _demandsStream,
       builder: (context, demandsSnapshot) {
-        if (demandsSnapshot.connectionState == ConnectionState.waiting) {
+        if (demandsSnapshot.connectionState == ConnectionState.waiting && !demandsSnapshot.hasData) {
           return const Center(child: CircularProgressIndicator(color: AppColors.primaryBlue));
         }
         
         final allDemands = demandsSnapshot.data ?? [];
+
+        // Auto-finalize demands if they are past 23:00 of their last day
+        for (final demand in allDemands) {
+          if (demand.status != 'FINALIZADAS' && demand.status != 'CANCELADA' && demand.status != 'RASCUNHO') {
+            final endDate = getDemandEndDate(demand.date);
+            final now = DateTime.now();
+            final lastDay23h = DateTime(endDate.year, endDate.month, endDate.day, 23, 0);
+            if (now.isAfter(lastDay23h) || now.isAtSameMomentAs(lastDay23h)) {
+              // Update in Firestore
+              FirebaseFirestore.instance.collection('demands').doc(demand.id).update({
+                'status': 'FINALIZADAS',
+              });
+            }
+          }
+        }
 
         // Safely update the selected demand details
         if (_selectedDemandForVinculo != null) {
@@ -608,9 +662,9 @@ class _DemandsManagementViewState extends State<DemandsManagementView> {
         }
 
         return StreamBuilder<QuerySnapshot>(
-          stream: FirebaseFirestore.instance.collection('users').snapshots(),
+          stream: _usersStream,
           builder: (context, usersSnapshot) {
-            if (usersSnapshot.connectionState == ConnectionState.waiting) {
+            if (usersSnapshot.connectionState == ConnectionState.waiting && !usersSnapshot.hasData) {
               return const Center(child: CircularProgressIndicator(color: AppColors.primaryBlue));
             }
             
@@ -828,7 +882,7 @@ class _DemandsManagementViewState extends State<DemandsManagementView> {
                                 border: Border.all(color: AppColors.cardBorder),
                               ),
                               child: TextField(
-                                onChanged: (val) => setState(() => _searchQuery = val),
+                                controller: _searchQueryCtrl,
                                 decoration: const InputDecoration(
                                   hintText: 'Buscar diária por nome, função, cliente ou projeto...',
                                   prefixIcon: Icon(IconsaxPlusLinear.search_normal_1, color: AppColors.textSecondary),
@@ -860,15 +914,15 @@ class _DemandsManagementViewState extends State<DemandsManagementView> {
                           scrollDirection: Axis.horizontal,
                           child: Row(
                             children: [
-                              _buildKanbanColumn('RASCUNHO', countRascunho, AppColors.textSecondary, filteredDemands.where((d) => d.status == 'RASCUNHO').toList()),
+                              _buildKanbanColumn('RASCUNHO', countRascunho, AppColors.textSecondary, filteredDemands.where((d) => d.status == 'RASCUNHO').toList(), 'RASCUNHO'),
                               const SizedBox(width: 20),
-                              _buildKanbanColumn('ABERTAS', countAbertas, AppColors.warning, filteredDemands.where((d) => d.status == 'ABERTAS').toList()),
+                              _buildKanbanColumn('ABERTAS', countAbertas, AppColors.warning, filteredDemands.where((d) => d.status == 'ABERTAS').toList(), 'ABERTAS'),
                               const SizedBox(width: 20),
-                              _buildKanbanColumn('PREENCHIDAS', countPreenchidas, Colors.purpleAccent, filteredDemands.where((d) => d.status == 'PREENCHIDAS').toList()),
+                              _buildKanbanColumn('PREENCHIDAS', countPreenchidas, Colors.purpleAccent, filteredDemands.where((d) => d.status == 'PREENCHIDAS').toList(), 'PREENCHIDAS'),
                               const SizedBox(width: 20),
-                              _buildKanbanColumn('EM ANDAMENTO', countAndamento, AppColors.primaryBlue, filteredDemands.where((d) => d.status == 'EM ANDAMENTO').toList()),
+                              _buildKanbanColumn('EM ANDAMENTO', countAndamento, AppColors.primaryBlue, filteredDemands.where((d) => d.status == 'EM ANDAMENTO').toList(), 'EM ANDAMENTO'),
                               const SizedBox(width: 20),
-                              _buildKanbanColumn('FINALIZADAS', countFinalizadas, AppColors.success, filteredDemands.where((d) => d.status == 'FINALIZADAS').toList()),
+                              _buildKanbanColumn('FINALIZADAS', countFinalizadas, AppColors.success, filteredDemands.where((d) => d.status == 'FINALIZADAS').toList(), 'FINALIZADAS'),
                             ],
                           ),
                         ),
@@ -939,7 +993,7 @@ class _DemandsManagementViewState extends State<DemandsManagementView> {
                                   border: Border.all(color: AppColors.cardBorder),
                                 ),
                                 child: TextField(
-                                  onChanged: (val) => setState(() => _searchQuery = val),
+                                  controller: _searchQueryCtrl,
                                   decoration: const InputDecoration(
                                     hintText: 'Buscar demanda por nome ou cargo...',
                                     prefixIcon: Icon(IconsaxPlusLinear.search_normal_1, color: AppColors.textSecondary),
@@ -1907,7 +1961,7 @@ class _DemandsManagementViewState extends State<DemandsManagementView> {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('applications').where('demandId', isEqualTo: demand.id).snapshots(),
       builder: (context, appSnapshot) {
-        if (appSnapshot.connectionState == ConnectionState.waiting) {
+        if (appSnapshot.connectionState == ConnectionState.waiting && !appSnapshot.hasData) {
           return const Center(child: CircularProgressIndicator(color: AppColors.primaryBlue));
         }
         final apps = appSnapshot.data?.docs ?? [];
@@ -2062,7 +2116,12 @@ class _DemandsManagementViewState extends State<DemandsManagementView> {
     
     promoterMap.forEach((cpf, promoter) {
       final name = promoter['name'] ?? '';
-      final matchesSearch = name.toLowerCase().contains(_promoterSearchQuery.toLowerCase()) || cpf.contains(_promoterSearchQuery);
+      final cleanCpf = cpf.replaceAll(RegExp(r'\D'), '');
+      final cleanQuery = _promoterSearchQuery.replaceAll(RegExp(r'\D'), '');
+      final matchesCpf = cleanQuery.isNotEmpty && cleanCpf.contains(cleanQuery);
+      final matchesSearch = name.toLowerCase().contains(_promoterSearchQuery.toLowerCase()) ||
+          cpf.contains(_promoterSearchQuery) ||
+          matchesCpf;
       if (!matchesSearch) return;
       
       final cv = getCurriculumData(promoter);
@@ -2098,7 +2157,7 @@ class _DemandsManagementViewState extends State<DemandsManagementView> {
       children: [
         // Search bar
         TextField(
-          onChanged: (val) => setState(() => _promoterSearchQuery = val),
+          controller: _promoterSearchQueryCtrl,
           decoration: InputDecoration(
             hintText: 'Buscar por nome ou CPF do promotor...',
             prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
@@ -2479,6 +2538,29 @@ class _DemandsManagementViewState extends State<DemandsManagementView> {
 
   Future<void> _forcarVinculo(BuildContext context, String cpf, String name, AppDemand demand) async {
     try {
+      // Check for duplicate application
+      final existingApps = await FirebaseFirestore.instance
+          .collection('applications')
+          .where('promoterCpf', isEqualTo: cpf)
+          .where('storeName', isEqualTo: demand.storeName)
+          .where('date', isEqualTo: demand.date)
+          .get();
+
+      final activeDuplicates = existingApps.docs.where((doc) {
+        final status = doc.data()['status'] ?? '';
+        return status != 'rejeitado' && status != 'cancelado' && status != 'nao_aprovada';
+      }).toList();
+
+      if (activeDuplicates.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$name já possui um agendamento ou inscrição ativa para esta loja nesta data!'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
+
       final now = DateTime.now().toIso8601String();
       
       // 1. Criar novo documento na coleção applications
@@ -2550,41 +2632,99 @@ class _DemandsManagementViewState extends State<DemandsManagementView> {
     }
   }
 
-  Widget _buildKanbanColumn(String title, int count, Color color, List<AppDemand> colDemands) {
-    return Container(
-      width: 320,
-      margin: const EdgeInsets.only(right: 20),
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.cardBorder)
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  Widget _buildKanbanColumn(String title, int count, Color color, List<AppDemand> colDemands, String columnStatus) {
+    return DragTarget<List<String>>(
+      onWillAccept: (data) => data != null && data.isNotEmpty,
+      onAccept: (draggedIds) async {
+        try {
+          final batch = FirebaseFirestore.instance.batch();
+          for (final id in draggedIds) {
+            batch.update(FirebaseFirestore.instance.collection('demands').doc(id), {
+              'status': columnStatus,
+            });
+          }
+          await batch.commit();
+          setState(() {
+            _selectedDemandIds.clear();
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${draggedIds.length} demanda(s) movida(s) para $title com sucesso!'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erro ao mover demandas: $e'), backgroundColor: AppColors.error),
+          );
+        }
+      },
+      builder: (context, candidateData, rejectedData) {
+        final isOver = candidateData.isNotEmpty;
+        return Container(
+          width: 320,
+          margin: const EdgeInsets.only(right: 20),
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: isOver ? color.withOpacity(0.04) : AppColors.background,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: isOver ? color : AppColors.cardBorder, width: isOver ? 1.5 : 1.0)
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: const TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(100)),
-                child: Text(count.toString(), style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w900)),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: colDemands.isEmpty 
+                            ? false 
+                            : (colDemands.every((d) => _selectedDemandIds.contains(d.id))
+                                ? true
+                                : (colDemands.any((d) => _selectedDemandIds.contains(d.id))
+                                    ? null
+                                    : false)),
+                        tristate: true,
+                        activeColor: AppColors.primaryBlue,
+                        onChanged: (val) {
+                          setState(() {
+                            if (val == true) {
+                              _selectedDemandIds.addAll(colDemands.map((d) => d.id));
+                            } else {
+                              for (var d in colDemands) {
+                                _selectedDemandIds.remove(d.id);
+                              }
+                            }
+                          });
+                        },
+                      ),
+                      const SizedBox(width: 4),
+                      Text(title, style: const TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
+                    ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(100)),
+                    child: Text(count.toString(), style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w900)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              Expanded(
+                child: colDemands.isEmpty 
+                ? Center(child: Text('Nenhuma demanda\npara esta etapa.', textAlign: TextAlign.center, style: TextStyle(color: AppColors.textSecondary.withOpacity(0.5), fontSize: 12, fontWeight: FontWeight.w600)))
+                : KanbanColumnList(
+                    colDemands: colDemands,
+                    selectedDemandIds: _selectedDemandIds,
+                    cardBuilder: _buildKanbanCard,
+                  ),
               ),
             ],
           ),
-          const SizedBox(height: 24),
-          Expanded(
-            child: colDemands.isEmpty 
-            ? Center(child: Text('Nenhuma demanda\npara esta etapa.', textAlign: TextAlign.center, style: TextStyle(color: AppColors.textSecondary.withOpacity(0.5), fontSize: 12, fontWeight: FontWeight.w600)))
-            : ListView.builder(
-                itemCount: colDemands.length,
-                itemBuilder: (context, i) => _buildKanbanCard(colDemands[i]),
-              ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -2978,7 +3118,7 @@ class _DemandsManagementViewState extends State<DemandsManagementView> {
             child: StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance.collection('applications').where('demandId', isEqualTo: demand.id).snapshots(),
               builder: (context, appSnapshot) {
-                if (appSnapshot.connectionState == ConnectionState.waiting) {
+                if (appSnapshot.connectionState == ConnectionState.waiting && !appSnapshot.hasData) {
                   return const Center(child: CircularProgressIndicator(color: AppColors.primaryBlue));
                 }
                 final apps = appSnapshot.data?.docs ?? [];
@@ -3182,7 +3322,12 @@ class _DemandsManagementViewState extends State<DemandsManagementView> {
     
     promoterMap.forEach((cpf, promoter) {
       final name = promoter['name'] ?? '';
-      final matchesSearch = name.toLowerCase().contains(_promoterSearchQuery.toLowerCase()) || cpf.contains(_promoterSearchQuery);
+      final cleanCpf = cpf.replaceAll(RegExp(r'\D'), '');
+      final cleanQuery = _promoterSearchQuery.replaceAll(RegExp(r'\D'), '');
+      final matchesCpf = cleanQuery.isNotEmpty && cleanCpf.contains(cleanQuery);
+      final matchesSearch = name.toLowerCase().contains(_promoterSearchQuery.toLowerCase()) ||
+          cpf.contains(_promoterSearchQuery) ||
+          matchesCpf;
       if (!matchesSearch) return;
       
       final cv = getCurriculumData(promoter);
@@ -3252,7 +3397,7 @@ class _DemandsManagementViewState extends State<DemandsManagementView> {
               border: Border.all(color: AppColors.cardBorder),
             ),
             child: TextField(
-              onChanged: (val) => setState(() => _promoterSearchQuery = val),
+              controller: _promoterSearchQueryCtrl,
               decoration: const InputDecoration(
                 hintText: 'Buscar por nome ou CPF...',
                 prefixIcon: Icon(Icons.search, color: AppColors.textSecondary, size: 18),
@@ -3997,6 +4142,7 @@ class _VacancyChronologyState extends State<VacancyChronology> {
   final _leftScrollCtrl = ScrollController();
   final _rightScrollCtrl = ScrollController();
   final Set<String> _selectedAppIds = {};
+  String? _lastAutoSelectedDemandId;
 
   @override
   void dispose() {
@@ -4041,8 +4187,20 @@ class _VacancyChronologyState extends State<VacancyChronology> {
     final String promoterName = letter['promoterName'] ?? '';
     final String promoterCpfFormatted = letter['promoterCpfFormatted'] ?? letter['promoterCpf'] ?? '';
     final String storeName = letter['storeName'] ?? '';
-    final int validityDays = type == 'treinamento' ? 1 : 3;
-    final DateTime expirationDateTime = pickedDate.add(Duration(days: validityDays));
+    
+    DateTime expirationDateTime;
+    if (letter['expiresAt'] != null) {
+      expirationDateTime = DateTime.parse(letter['expiresAt']);
+    } else {
+      final int defaultDays = type == 'treinamento' ? 1 : 3;
+      expirationDateTime = pickedDate.add(Duration(days: defaultDays));
+    }
+    
+    int validityDays = expirationDateTime.difference(pickedDate).inDays;
+    if (validityDays <= 0) {
+      validityDays = 1;
+    }
+    
     final String expiresAt = DateFormat("dd/MM/yyyy").format(expirationDateTime);
 
     final String printHtml = '''
@@ -4247,6 +4405,14 @@ class _VacancyChronologyState extends State<VacancyChronology> {
     final url = html.Url.createObjectUrlFromBlob(blob);
     html.window.open(url, '_blank');
     html.Url.revokeObjectUrl(url);
+
+    // Record that this letter has been printed
+    try {
+      final String docId = letter['id'] ?? "${letter['demandId'] ?? widget.demand.id}_${letter['promoterCpf'] ?? ''}_${letter['type'] ?? 'diarias'}";
+      await FirebaseFirestore.instance.collection('letters').doc(docId).set({'printed': true}, SetOptions(merge: true));
+    } catch (e) {
+      print("Erro ao atualizar impressao da carta: $e");
+    }
   }
 
   Future<void> _transitionApplicants(BuildContext context, List<QueryDocumentSnapshot> appsToTransition, String targetStatus) async {
@@ -4280,7 +4446,9 @@ class _VacancyChronologyState extends State<VacancyChronology> {
             'type': type,
             'title': type == 'treinamento' ? 'CARTA DE APRESENTAÇÃO - TREINAMENTO' : 'CARTA DE APRESENTAÇÃO - DIÁRIAS',
             'createdAt': DateTime.now().toIso8601String(),
-            'expiresAt': DateTime.now().add(Duration(days: type == 'treinamento' ? 1 : 3)).toIso8601String(),
+            'expiresAt': type == 'treinamento'
+                ? DateTime.now().add(const Duration(days: 1)).toIso8601String()
+                : getDemandEndDate(widget.demand.date).toIso8601String(),
           });
         }
       }
@@ -4348,10 +4516,43 @@ class _VacancyChronologyState extends State<VacancyChronology> {
             final lettersDocs = lettersSnapshot.data?.docs ?? [];
             final Map<String, Map<String, dynamic>> letterMap = {};
             for (var doc in lettersDocs) {
-              final data = doc.data() as Map<String, dynamic>;
-              final cpf = data['promoterCpf'] ?? '';
-              final type = data['type'] ?? '';
+              final data = Map<String, dynamic>.from(doc.data() as Map<String, dynamic>);
+              data['id'] = doc.id;
+              
+              final parts = doc.id.split('_');
+              final String type = data['type'] ?? (parts.isNotEmpty ? parts.last : '');
+              final String cpf = data['promoterCpf'] ?? (parts.length >= 2 ? parts[parts.length - 2] : '');
+              final String demandId = data['demandId'] ?? (parts.length >= 3 ? parts.sublist(0, parts.length - 2).join('_') : '');
+              
+              data['type'] = type;
+              data['promoterCpf'] = cpf;
+              data['demandId'] = demandId;
+              
               letterMap["${cpf}_${type}"] = data;
+            }
+
+            // Detect if any applicant has checked in
+            bool hasCheckIn = false;
+            for (var doc in apps) {
+              final data = doc.data() as Map<String, dynamic>;
+              final checkInTime = data['checkInTime'] ?? '';
+              if (checkInTime.toString().isNotEmpty) {
+                hasCheckIn = true;
+                break;
+              }
+            }
+
+            // Auto-navigate chronology steps reactively
+            final bool isFinalized = widget.demand.status == 'FINALIZADAS';
+            if (isFinalized && _lastAutoSelectedDemandId != widget.demand.id) {
+              _selectedStep = 6; // Ação Realizada
+              _lastAutoSelectedDemandId = widget.demand.id;
+            } else if (hasCheckIn && _lastAutoSelectedDemandId != widget.demand.id) {
+              _selectedStep = 5; // Na Loja no Dia
+              _lastAutoSelectedDemandId = widget.demand.id;
+            } else if (!hasCheckIn && !isFinalized && _lastAutoSelectedDemandId != widget.demand.id) {
+              _selectedStep = 1; // Default back to Captação & Cadastros when choosing a new demand
+              _lastAutoSelectedDemandId = widget.demand.id;
             }
 
             final steps = [
@@ -5019,13 +5220,31 @@ class _VacancyChronologyState extends State<VacancyChronology> {
                           ],
                         ),
                       ),
-                      if (letter != null)
+                      if (letter != null) ...[
                         ElevatedButton.icon(
                           onPressed: () => _printLetterFromData(letter),
                           icon: const Icon(Icons.print, size: 14, color: Colors.white),
                           label: const Text('IMPRIMIR CARTA', style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
                           style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryBlue, elevation: 0),
                         ),
+                        if (letter['printed'] == true) ...[
+                          const SizedBox(width: 8),
+                          ElevatedButton.icon(
+                            onPressed: () async {
+                              await _transitionApplicants(context, [app], 'aprovado');
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('${promoter['name']} aprovado para início em loja (carta de diárias gerada).'),
+                                  backgroundColor: AppColors.success,
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.check_circle_outline, size: 14, color: Colors.white),
+                            label: const Text('APROVAR INÍCIO EM LOJA', style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
+                            style: ElevatedButton.styleFrom(backgroundColor: AppColors.success, elevation: 0),
+                          ),
+                        ],
+                      ],
                     ],
                   ),
                 );
@@ -5113,7 +5332,7 @@ class _VacancyChronologyState extends State<VacancyChronology> {
       final appData = app.data() as Map<String, dynamic>;
       final status = appData['status'] ?? '';
       final checkInTime = appData['checkInTime'] ?? '';
-      return status == 'aprovado' || status == 'selecionado' || status == 'em_andamento' || status == 'em_analise' || checkInTime.toString().isNotEmpty;
+      return status == 'aprovado' || status == 'selecionado' || status == 'tarefa_aprovada' || status == 'treinamento' || status == 'em_andamento' || status == 'em_analise' || checkInTime.toString().isNotEmpty;
     }).toList();
 
     return Column(
@@ -5482,6 +5701,66 @@ class CustomHistogram extends StatelessWidget {
           ],
         );
       }),
+    );
+  }
+}
+
+class KanbanColumnList extends StatefulWidget {
+  final List<AppDemand> colDemands;
+  final Set<String> selectedDemandIds;
+  final Widget Function(AppDemand) cardBuilder;
+
+  const KanbanColumnList({
+    super.key,
+    required this.colDemands,
+    required this.selectedDemandIds,
+    required this.cardBuilder,
+  });
+
+  @override
+  State<KanbanColumnList> createState() => _KanbanColumnListState();
+}
+
+class _KanbanColumnListState extends State<KanbanColumnList> {
+  final _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scrollbar(
+      controller: _scrollController,
+      thumbVisibility: true,
+      trackVisibility: true,
+      child: ListView.builder(
+        controller: _scrollController,
+        itemCount: widget.colDemands.length,
+        itemBuilder: (context, i) {
+          final demand = widget.colDemands[i];
+          return Draggable<List<String>>(
+            data: widget.selectedDemandIds.contains(demand.id)
+                ? widget.selectedDemandIds.toList()
+                : [demand.id],
+            feedback: Material(
+              elevation: 8,
+              borderRadius: BorderRadius.circular(12),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 280),
+                child: widget.cardBuilder(demand),
+              ),
+            ),
+            childWhenDragging: Opacity(
+              opacity: 0.3,
+              child: widget.cardBuilder(demand),
+            ),
+            child: widget.cardBuilder(demand),
+          );
+        },
+      ),
     );
   }
 }

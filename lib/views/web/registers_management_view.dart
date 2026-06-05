@@ -1433,105 +1433,16 @@ class _RegistersManagementViewState extends State<RegistersManagementView> with 
     required Function(T) onDelete,
     required Widget Function(T) detailsBuilder,
   }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          flex: 1,
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white, 
-              borderRadius: BorderRadius.circular(16), 
-              border: Border.all(color: AppColors.cardBorder),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 15, offset: const Offset(0, 5))
-              ]
-            ),
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          style: const TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600),
-                          decoration: InputDecoration(
-                            hintText: 'Buscar...',
-                            hintStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
-                            prefixIcon: const Icon(IconsaxPlusLinear.search_normal, color: AppColors.textSecondary, size: 20),
-                            filled: true,
-                            fillColor: AppColors.background,
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      IconButton(
-                        onPressed: onAdd, 
-                        icon: const Icon(IconsaxPlusLinear.add_square, color: AppColors.primaryBlue, size: 28), 
-                        tooltip: buttonLabel
-                      )
-                    ],
-                  ),
-                ),
-                const Divider(color: AppColors.cardBorder, height: 1),
-                Expanded(
-                  child: items.isEmpty ? const Center(child: Text('Nenhum item.', style: TextStyle(color: AppColors.textSecondary))) : ListView.builder(
-                    itemCount: items.length,
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    itemBuilder: (context, index) {
-                      final item = items[index];
-                      final isSelected = item == selectedItem;
-                      return ListTile(
-                        selected: isSelected,
-                        selectedTileColor: AppColors.primaryBlue.withOpacity(0.05),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                        title: Text(titleBuilder(item), style: TextStyle(
-                          color: isSelected ? AppColors.primaryBlue : AppColors.textPrimary, 
-                          fontWeight: isSelected ? FontWeight.w800 : FontWeight.w700,
-                          fontSize: 15
-                        )),
-                        subtitle: Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(subtitleBuilder(item), style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w500)),
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(icon: const Icon(IconsaxPlusLinear.trash, color: AppColors.error, size: 18), onPressed: () => onDelete(item)),
-                            Icon(IconsaxPlusLinear.arrow_right_3, color: isSelected ? AppColors.primaryBlue : AppColors.textSecondary, size: 16),
-                          ],
-                        ),
-                        onTap: () => onSelect(item),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(width: 32),
-        Expanded(
-          flex: 2,
-          child: Container(
-            padding: const EdgeInsets.all(40),
-            decoration: BoxDecoration(
-              color: Colors.white, 
-              borderRadius: BorderRadius.circular(16), 
-              border: Border.all(color: AppColors.cardBorder),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 15, offset: const Offset(0, 5))
-              ]
-            ),
-            child: selectedItem == null || !items.contains(selectedItem) 
-              ? const Center(child: Text('Selecione ou crie um item para ver os detalhes', style: TextStyle(color: AppColors.textSecondary, fontSize: 16, fontWeight: FontWeight.w500))) 
-              : detailsBuilder(selectedItem),
-          ),
-        ),
-      ],
+    return StandardListWithDetails<T>(
+      buttonLabel: buttonLabel,
+      items: items,
+      selectedItem: selectedItem,
+      titleBuilder: titleBuilder,
+      subtitleBuilder: subtitleBuilder,
+      onSelect: onSelect,
+      onAdd: onAdd,
+      onDelete: onDelete,
+      detailsBuilder: detailsBuilder,
     );
   }
 
@@ -1702,7 +1613,170 @@ class _RegistersManagementViewState extends State<RegistersManagementView> with 
             }).toList(),
           ],
         );
-      }
+      },
+    );
+  }
+}
+
+class StandardListWithDetails<T> extends StatefulWidget {
+  final String buttonLabel;
+  final List<T> items;
+  final T? selectedItem;
+  final String Function(T) titleBuilder;
+  final String Function(T) subtitleBuilder;
+  final Function(T) onSelect;
+  final Function() onAdd;
+  final Function(T) onDelete;
+  final Widget Function(T) detailsBuilder;
+
+  const StandardListWithDetails({
+    super.key,
+    required this.buttonLabel,
+    required this.items,
+    required this.selectedItem,
+    required this.titleBuilder,
+    required this.subtitleBuilder,
+    required this.onSelect,
+    required this.onAdd,
+    required this.onDelete,
+    required this.detailsBuilder,
+  });
+
+  @override
+  State<StandardListWithDetails<T>> createState() => _StandardListWithDetailsState<T>();
+}
+
+class _StandardListWithDetailsState<T> extends State<StandardListWithDetails<T>> {
+  late final TextEditingController _searchCtrl;
+  String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _searchCtrl = TextEditingController();
+    _searchCtrl.addListener(() {
+      setState(() {
+        _searchQuery = _searchCtrl.text;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filteredItems = widget.items.where((item) {
+      if (_searchQuery.isEmpty) return true;
+      final query = _searchQuery.toLowerCase().trim();
+      final title = widget.titleBuilder(item).toLowerCase();
+      final subtitle = widget.subtitleBuilder(item).toLowerCase();
+      return title.contains(query) || subtitle.contains(query);
+    }).toList();
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          flex: 1,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white, 
+              borderRadius: BorderRadius.circular(16), 
+              border: Border.all(color: AppColors.cardBorder),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 15, offset: const Offset(0, 5))
+              ]
+            ),
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _searchCtrl,
+                          style: const TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600),
+                          decoration: InputDecoration(
+                            hintText: 'Buscar...',
+                            hintStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+                            prefixIcon: const Icon(IconsaxPlusLinear.search_normal, color: AppColors.textSecondary, size: 20),
+                            filled: true,
+                            fillColor: AppColors.background,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      IconButton(
+                        onPressed: widget.onAdd, 
+                        icon: const Icon(IconsaxPlusLinear.add_square, color: AppColors.primaryBlue, size: 28), 
+                        tooltip: widget.buttonLabel
+                      )
+                    ],
+                  ),
+                ),
+                const Divider(color: AppColors.cardBorder, height: 1),
+                Expanded(
+                  child: filteredItems.isEmpty ? const Center(child: Text('Nenhum item.', style: TextStyle(color: AppColors.textSecondary))) : ListView.builder(
+                    itemCount: filteredItems.length,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    itemBuilder: (context, index) {
+                      final item = filteredItems[index];
+                      final isSelected = item == widget.selectedItem;
+                      return ListTile(
+                        selected: isSelected,
+                        selectedTileColor: AppColors.primaryBlue.withOpacity(0.05),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                        title: Text(widget.titleBuilder(item), style: TextStyle(
+                          color: isSelected ? AppColors.primaryBlue : AppColors.textPrimary, 
+                          fontWeight: isSelected ? FontWeight.w800 : FontWeight.w700,
+                          fontSize: 15
+                        )),
+                        subtitle: Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(widget.subtitleBuilder(item), style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w500)),
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(icon: const Icon(IconsaxPlusLinear.trash, color: AppColors.error, size: 18), onPressed: () => widget.onDelete(item)),
+                            Icon(IconsaxPlusLinear.arrow_right_3, color: isSelected ? AppColors.primaryBlue : AppColors.textSecondary, size: 16),
+                          ],
+                        ),
+                        onTap: () => widget.onSelect(item),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 32),
+        Expanded(
+          flex: 2,
+          child: Container(
+            padding: const EdgeInsets.all(40),
+            decoration: BoxDecoration(
+              color: Colors.white, 
+              borderRadius: BorderRadius.circular(16), 
+              border: Border.all(color: AppColors.cardBorder),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 15, offset: const Offset(0, 5))
+              ]
+            ),
+            child: widget.selectedItem == null || !widget.items.contains(widget.selectedItem) 
+              ? const Center(child: Text('Selecione ou crie um item para ver os detalhes', style: TextStyle(color: AppColors.textSecondary, fontSize: 16, fontWeight: FontWeight.w500))) 
+              : widget.detailsBuilder(widget.selectedItem!),
+          ),
+        ),
+      ],
     );
   }
 }

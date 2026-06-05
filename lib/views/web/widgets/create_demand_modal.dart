@@ -93,12 +93,76 @@ class _CreateDemandModalState extends State<CreateDemandModal> with SingleTicker
   // Date range/period
   DateTime _periodStartDate = DateTime.now();
   DateTime _periodEndDate = DateTime.now().add(const Duration(days: 2));
+  DateTime? _selectedShiftDate;
 
   // Dynamic shifts/scales list
   List<Map<String, dynamic>> _shifts = [];
   TimeOfDay _entryTimeInput = const TimeOfDay(hour: 8, minute: 0);
   TimeOfDay _exitTimeInput = const TimeOfDay(hour: 14, minute: 0);
   final _vacanciesInputController = TextEditingController(text: '1');
+
+  List<DateTime> _getDaysInPeriod() {
+    List<DateTime> days = [];
+    DateTime current = DateTime(_periodStartDate.year, _periodStartDate.month, _periodStartDate.day);
+    final end = DateTime(_periodEndDate.year, _periodEndDate.month, _periodEndDate.day);
+    while (current.isBefore(end) || current.isAtSameMomentAs(end)) {
+      days.add(current);
+      current = current.add(const Duration(days: 1));
+    }
+    return days;
+  }
+
+  int _getProjectWorkdayHours() {
+    if (_selectedProject == null) return 6; // Default to 6 hours
+    final proj = _projects.cast<AppProject?>().firstWhere(
+      (p) => p?.name == _selectedProject,
+      orElse: () => null,
+    );
+    if (proj == null) return 6;
+    final nameLower = proj.name.toLowerCase();
+    if (nameLower.contains('frente de caixa')) {
+      return 6;
+    }
+    return 6; // Default standard workday
+  }
+
+  TimeOfDay _calculateExitTime(TimeOfDay entryTime) {
+    final hours = _getProjectWorkdayHours();
+    int newHour = (entryTime.hour + hours) % 24;
+    return TimeOfDay(hour: newHour, minute: entryTime.minute);
+  }
+
+  void _updateShiftsOnPeriodChange() {
+    setState(() {
+      _shifts = _shifts.where((s) {
+        final d = s['date'] as DateTime?;
+        if (d == null) return false;
+        final dayOnly = DateTime(d.year, d.month, d.day);
+        final startOnly = DateTime(_periodStartDate.year, _periodStartDate.month, _periodStartDate.day);
+        final endOnly = DateTime(_periodEndDate.year, _periodEndDate.month, _periodEndDate.day);
+        return (dayOnly.isAfter(startOnly) || dayOnly.isAtSameMomentAs(startOnly)) &&
+               (dayOnly.isBefore(endOnly) || dayOnly.isAtSameMomentAs(endOnly));
+      }).toList();
+
+      if (_selectedShiftDate != null) {
+        final checkVal = DateTime(_selectedShiftDate!.year, _selectedShiftDate!.month, _selectedShiftDate!.day);
+        final startOnly = DateTime(_periodStartDate.year, _periodStartDate.month, _periodStartDate.day);
+        final endOnly = DateTime(_periodEndDate.year, _periodEndDate.month, _periodEndDate.day);
+        if (checkVal.isBefore(startOnly) || checkVal.isAfter(endOnly)) {
+          _selectedShiftDate = null;
+        }
+      }
+
+      if (_shifts.isEmpty) {
+        _shifts.add({
+          'date': _periodStartDate,
+          'entry': _entryTimeInput,
+          'exit': _calculateExitTime(_entryTimeInput),
+          'vacancies': 1,
+        });
+      }
+    });
+  }
 
   // Selected characteristic
   String? _selectedCharacteristicId;
@@ -140,6 +204,7 @@ class _CreateDemandModalState extends State<CreateDemandModal> with SingleTicker
     
     // Inicializa com um horário/escala padrão
     _shifts.add({
+      'date': _periodStartDate,
       'entry': const TimeOfDay(hour: 8, minute: 0),
       'exit': const TimeOfDay(hour: 14, minute: 0),
       'vacancies': 1,
@@ -290,12 +355,15 @@ class _CreateDemandModalState extends State<CreateDemandModal> with SingleTicker
         final lng = storeObj?.longitude;
 
         for (var shift in _shifts) {
+          final shiftDate = shift['date'] as DateTime? ?? _periodStartDate;
           final entry = shift['entry'] as TimeOfDay;
           final exit = shift['exit'] as TimeOfDay;
           final vacancies = shift['vacancies'] as int;
           
           final timeRange = "${entry.format(context)} - ${exit.format(context)}";
-          final dateRangeStr = "${DateFormat('dd/MM/yyyy').format(_periodStartDate)} - ${DateFormat('dd/MM/yyyy').format(_periodEndDate)}";
+          final dateStr = DateFormat('dd/MM/yyyy').format(shiftDate);
+          final entryStr = "${entry.hour.toString().padLeft(2, '0')}:${entry.minute.toString().padLeft(2, '0')}";
+          final exitStr = "${exit.hour.toString().padLeft(2, '0')}:${exit.minute.toString().padLeft(2, '0')}";
           
           final id = "${DateTime.now().millisecondsSinceEpoch}_ind_$count";
 
@@ -308,7 +376,7 @@ class _CreateDemandModalState extends State<CreateDemandModal> with SingleTicker
             distance: '0.0 KM',
             timeRange: timeRange,
             value: double.tryParse(_valorController.text.replaceAll(',', '.')) ?? characteristic?.defaultValue ?? 150.0,
-            date: dateRangeStr,
+            date: dateStr,
             urgency: 'NORMAL',
             status: status,
             clientName: _selectedClient,
@@ -327,6 +395,8 @@ class _CreateDemandModalState extends State<CreateDemandModal> with SingleTicker
             requiredDocuments: characteristic?.requiredDocuments,
             latitude: lat,
             longitude: lng,
+            entryTime: entryStr,
+            exitTime: exitStr,
           );
 
           await _api.saveDemand(newDemand);
@@ -936,6 +1006,7 @@ class _CreateDemandModalState extends State<CreateDemandModal> with SingleTicker
               Expanded(child: _buildDropdown('Projeto *', _selectedClient == null ? [] : _projects.where((p) => p.clientId == _clients.firstWhere((c) => c.name == _selectedClient).id).map((p) => p.name).toList(), _selectedProject, (val) {
                 setState(() {
                   _selectedProject = val;
+                  _exitTimeInput = _calculateExitTime(_entryTimeInput);
                 });
               })),
               const SizedBox(width: 20),
@@ -973,6 +1044,7 @@ class _CreateDemandModalState extends State<CreateDemandModal> with SingleTicker
                         if (_periodEndDate.isBefore(_periodStartDate)) {
                           _periodEndDate = _periodStartDate.add(const Duration(days: 2));
                         }
+                        _updateShiftsOnPeriodChange();
                         _updateAutoName();
                       });
                     }
@@ -993,6 +1065,7 @@ class _CreateDemandModalState extends State<CreateDemandModal> with SingleTicker
                     if (date != null) {
                       setState(() {
                         _periodEndDate = date;
+                        _updateShiftsOnPeriodChange();
                         _updateAutoName();
                       });
                     }
@@ -1161,10 +1234,36 @@ class _CreateDemandModalState extends State<CreateDemandModal> with SingleTicker
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
+                  children: [
+                    Expanded(
+                      child: _buildDropdown(
+                        'Dia da Ação',
+                        ['Todos os dias', ..._getDaysInPeriod().map((d) => DateFormat('dd/MM/yyyy').format(d))],
+                        _selectedShiftDate == null ? 'Todos os dias' : DateFormat('dd/MM/yyyy').format(_selectedShiftDate!),
+                        (val) {
+                          setState(() {
+                            if (val == 'Todos os dias' || val == null) {
+                              _selectedShiftDate = null;
+                            } else {
+                              _selectedShiftDate = DateFormat('dd/MM/yyyy').parse(val);
+                            }
+                          });
+                        }
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Expanded(
-                      child: _buildTimePicker('Horário de Entrada', _entryTimeInput, (t) => setState(() => _entryTimeInput = t)),
+                      child: _buildTimePicker('Horário de Entrada', _entryTimeInput, (t) {
+                        setState(() {
+                          _entryTimeInput = t;
+                          _exitTimeInput = _calculateExitTime(t);
+                        });
+                      }),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -1179,10 +1278,31 @@ class _CreateDemandModalState extends State<CreateDemandModal> with SingleTicker
                       onPressed: () {
                         final v = int.tryParse(_vacanciesInputController.text) ?? 1;
                         setState(() {
-                          _shifts.add({
-                            'entry': _entryTimeInput,
-                            'exit': _exitTimeInput,
-                            'vacancies': v,
+                          if (_selectedShiftDate == null) {
+                            final days = _getDaysInPeriod();
+                            for (var day in days) {
+                              _shifts.add({
+                                'date': day,
+                                'entry': _entryTimeInput,
+                                'exit': _exitTimeInput,
+                                'vacancies': v,
+                              });
+                            }
+                          } else {
+                            _shifts.add({
+                              'date': _selectedShiftDate!,
+                              'entry': _entryTimeInput,
+                              'exit': _exitTimeInput,
+                              'vacancies': v,
+                            });
+                          }
+                          _shifts.sort((a, b) {
+                            final dCompare = (a['date'] as DateTime).compareTo(b['date'] as DateTime);
+                            if (dCompare != 0) return dCompare;
+                            final entryA = a['entry'] as TimeOfDay;
+                            final entryB = b['entry'] as TimeOfDay;
+                            if (entryA.hour != entryB.hour) return entryA.hour.compareTo(entryB.hour);
+                            return entryA.minute.compareTo(entryB.minute);
                           });
                         });
                       },
@@ -1205,14 +1325,16 @@ class _CreateDemandModalState extends State<CreateDemandModal> with SingleTicker
                     runSpacing: 12,
                     children: List.generate(_shifts.length, (idx) {
                       final s = _shifts[idx];
+                      final DateTime d = s['date'] as DateTime? ?? _periodStartDate;
                       final entryTime = s['entry'] as TimeOfDay;
                       final exitTime = s['exit'] as TimeOfDay;
                       final v = s['vacancies'] as int;
+                      final dateStr = DateFormat('dd/MM').format(d);
                       return Chip(
                         backgroundColor: AppColors.primaryBlue.withOpacity(0.05),
                         side: const BorderSide(color: AppColors.primaryBlue, width: 0.5),
                         label: Text(
-                          "${entryTime.format(context)} - ${exitTime.format(context)} ($v ${v == 1 ? 'vaga' : 'vagas'})",
+                          "Dia $dateStr: ${entryTime.format(context)} - ${exitTime.format(context)} ($v ${v == 1 ? 'vaga' : 'vagas'})",
                           style: const TextStyle(color: AppColors.primaryBlue, fontWeight: FontWeight.bold, fontSize: 12),
                         ),
                         deleteIcon: const Icon(Icons.cancel, size: 16, color: AppColors.error),

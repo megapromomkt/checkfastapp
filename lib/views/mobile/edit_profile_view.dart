@@ -68,7 +68,7 @@ class _EditProfileViewState extends State<EditProfileView> {
             const SizedBox(height: 24),
             _buildField('E-MAIL', _emailController, IconsaxPlusLinear.sms),
             const SizedBox(height: 24),
-            _buildField('CELULAR / WHATSAPP', _phoneController, IconsaxPlusLinear.call),
+            _buildField('CELULAR / WHATSAPP *', _phoneController, IconsaxPlusLinear.call),
             const SizedBox(height: 24),
             _buildField('CEP', _cepController, IconsaxPlusLinear.location),
             const SizedBox(height: 24),
@@ -87,6 +87,13 @@ class _EditProfileViewState extends State<EditProfileView> {
                   if (cleanCPF.isEmpty) {
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('CPF inválido.'), backgroundColor: Colors.redAccent));
+                    }
+                    return;
+                  }
+
+                  if (_phoneController.text.trim().isEmpty) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('O celular / WhatsApp é obrigatório.'), backgroundColor: Colors.redAccent));
                     }
                     return;
                   }

@@ -1050,6 +1050,8 @@ class AppUser {
   bool trainingCompleted;
   bool atacadaoExperience;
   bool isBlocked;
+  String phone;
+  String pixKey;
 
   AppUser({
     required this.id,
@@ -1076,6 +1078,8 @@ class AppUser {
     this.trainingCompleted = false,
     this.atacadaoExperience = false,
     this.isBlocked = false,
+    this.phone = '',
+    this.pixKey = '',
   });
 
   Map<String, dynamic> toMap() {
@@ -1104,6 +1108,8 @@ class AppUser {
       'trainingCompleted': trainingCompleted,
       'atacadaoExperience': atacadaoExperience,
       'isBlocked': isBlocked,
+      'phone': phone,
+      'pixKey': pixKey,
     };
   }
 
@@ -1133,6 +1139,8 @@ class AppUser {
       trainingCompleted: map['trainingCompleted'] ?? map['training_completed'] ?? false,
       atacadaoExperience: map['atacadaoExperience'] ?? map['atacadao_experience'] ?? false,
       isBlocked: map['isBlocked'] ?? map['is_blocked'] ?? false,
+      phone: map['phone'] ?? map['telefone'] ?? map['whatsapp'] ?? '',
+      pixKey: map['pixKey'] ?? map['pix_key'] ?? '',
     );
   }
 }

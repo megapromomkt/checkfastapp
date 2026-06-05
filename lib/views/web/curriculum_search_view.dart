@@ -27,6 +27,9 @@ class _CurriculumSearchViewState extends State<CurriculumSearchView> {
   // Custom filter states
   bool _isFiltersExpanded = true;
   String _searchQuery = '';
+  late final TextEditingController _searchQueryCtrl;
+  late final TextEditingController _brandCtrl;
+  late final TextEditingController _redeCtrl;
   String _filterRole = 'Todos';
   String _filterCity = 'Todas';
   String _filterContract = 'Qualquer';
@@ -91,12 +94,33 @@ class _CurriculumSearchViewState extends State<CurriculumSearchView> {
   @override
   void initState() {
     super.initState();
+    _searchQueryCtrl = TextEditingController(text: _searchQuery);
+    _searchQueryCtrl.addListener(() {
+      setState(() {
+        _searchQuery = _searchQueryCtrl.text;
+      });
+    });
+    _brandCtrl = TextEditingController(text: _filterBrand);
+    _brandCtrl.addListener(() {
+      setState(() {
+        _filterBrand = _brandCtrl.text;
+      });
+    });
+    _redeCtrl = TextEditingController(text: _filterRede);
+    _redeCtrl.addListener(() {
+      setState(() {
+        _filterRede = _redeCtrl.text;
+      });
+    });
     _mainScrollController = ScrollController();
     _loadData();
   }
 
   @override
   void dispose() {
+    _searchQueryCtrl.dispose();
+    _brandCtrl.dispose();
+    _redeCtrl.dispose();
     _mainScrollController.dispose();
     super.dispose();
   }
@@ -1217,7 +1241,7 @@ class _CurriculumSearchViewState extends State<CurriculumSearchView> {
                               const Text('PESQUISAR POR NOME OU RESUMO', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold, fontSize: 11)),
                               const SizedBox(height: 8),
                               TextField(
-                                onChanged: (val) => setState(() => _searchQuery = val),
+                                controller: _searchQueryCtrl,
                                 style: const TextStyle(fontSize: 13),
                                 decoration: InputDecoration(
                                   hintText: 'Pesquisar por nome ou resumo...',
@@ -1319,7 +1343,7 @@ class _CurriculumSearchViewState extends State<CurriculumSearchView> {
                               const Text('EXPERIÊNCIA EM MARCA', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold, fontSize: 11)),
                               const SizedBox(height: 8),
                               TextField(
-                                onChanged: (val) => setState(() => _filterBrand = val),
+                                controller: _brandCtrl,
                                 style: const TextStyle(fontSize: 13),
                                 decoration: InputDecoration(
                                   hintText: 'Ex: Nestlé, Coca-Cola...',
@@ -1348,7 +1372,7 @@ class _CurriculumSearchViewState extends State<CurriculumSearchView> {
                               const Text('EXPERIÊNCIA EM REDE/SUPERMERCADO', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold, fontSize: 11)),
                               const SizedBox(height: 8),
                               TextField(
-                                onChanged: (val) => setState(() => _filterRede = val),
+                                controller: _redeCtrl,
                                 style: const TextStyle(fontSize: 13),
                                 decoration: InputDecoration(
                                   hintText: 'Ex: Atacadão, Assaí...',
