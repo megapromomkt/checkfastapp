@@ -43,6 +43,8 @@ class _DemandsManagementViewState extends State<DemandsManagementView> {
   String _filterProject = 'Todos';
   String _filterRole = 'Todos';
   String _filterPriority = 'Todas';
+  String _filterDate = '';
+  late final TextEditingController _filterDateController;
   bool _filtersExpanded = false;
 
   // Mass Actions Selection
@@ -68,6 +70,12 @@ class _DemandsManagementViewState extends State<DemandsManagementView> {
         _searchQuery = _searchQueryCtrl.text;
       });
     });
+    _filterDateController = TextEditingController(text: _filterDate);
+    _filterDateController.addListener(() {
+      setState(() {
+        _filterDate = _filterDateController.text;
+      });
+    });
     _promoterSearchQueryCtrl = TextEditingController(text: _promoterSearchQuery);
     _promoterSearchQueryCtrl.addListener(() {
       setState(() {
@@ -82,6 +90,7 @@ class _DemandsManagementViewState extends State<DemandsManagementView> {
   void dispose() {
     _searchQueryCtrl.dispose();
     _promoterSearchQueryCtrl.dispose();
+    _filterDateController.dispose();
     _horizontalDemandScrollController.dispose();
     super.dispose();
   }
@@ -698,8 +707,9 @@ class _DemandsManagementViewState extends State<DemandsManagementView> {
               final matchesProject = _filterProject == 'Todos' || d.projectName == _filterProject;
               final matchesRole = _filterRole == 'Todos' || d.role == _filterRole;
               final matchesPriority = _filterPriority == 'Todas' || d.priority == _filterPriority;
+              final matchesDate = _filterDate.isEmpty || d.date.toLowerCase().contains(_filterDate.toLowerCase());
 
-              return matchesSearch && matchesClient && matchesProject && matchesRole && matchesPriority;
+              return matchesSearch && matchesClient && matchesProject && matchesRole && matchesPriority && matchesDate;
             }).toList();
 
             // 3. Agrupamento por status (para o Kanban)
@@ -796,6 +806,27 @@ class _DemandsManagementViewState extends State<DemandsManagementView> {
                           ),
                         ),
                         const SizedBox(width: 15),
+                        // Data da Diária
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('DATA DA DIÁRIA', style: TextStyle(color: AppColors.primaryBlue, fontSize: 10, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 6),
+                              TextField(
+                                controller: _filterDateController,
+                                style: const TextStyle(fontSize: 12),
+                                decoration: const InputDecoration(
+                                  hintText: 'Ex: 18/05',
+                                  hintStyle: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                  border: OutlineInputBorder(),
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 11),
+                                ),
+                              )
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 15),
                         // Limpar Filtros
                         IconButton(
                           icon: const Icon(Icons.refresh, color: AppColors.textSecondary),
@@ -806,6 +837,8 @@ class _DemandsManagementViewState extends State<DemandsManagementView> {
                               _filterProject = 'Todos';
                               _filterRole = 'Todos';
                               _filterPriority = 'Todas';
+                              _filterDate = '';
+                              _filterDateController.clear();
                               _searchQuery = '';
                             });
                           },
